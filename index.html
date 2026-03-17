@@ -31,8 +31,9 @@
       margin: 0 auto;
       padding: 12px;
       display: grid;
-      grid-template-rows: auto 1.2fr 1fr;
+      grid-template-rows: auto auto auto;
       gap: 12px;
+      align-content: start;
     }
     h1 {
       margin: 0;
@@ -80,6 +81,7 @@
       border-radius: 18px;
       padding: 14px;
       min-height: 0;
+      height: auto;
       box-shadow: 0 2px 10px rgba(16, 24, 40, 0.05);
     }
     .bottom {
@@ -87,6 +89,7 @@
       grid-template-columns: 1fr 1fr;
       gap: 12px;
       min-height: 0;
+      align-items: start;
     }
     .titleRow {
       display: flex;
@@ -252,8 +255,10 @@
 
     .mixedPane {
       display: grid;
-      grid-template-rows: auto auto 1fr auto;
+      grid-template-rows: auto auto auto auto;
       min-height: 0;
+      align-content: start;
+      height: auto;
     }
     .hint {
       color: var(--muted);
@@ -261,7 +266,7 @@
       margin: 0 0 8px;
     }
     .mixedEditor {
-      min-height: 0;
+      min-height: 260px;
       width: 100%;
       height: 100%;
       overflow: auto;
@@ -274,6 +279,8 @@
       word-break: break-word;
       font-size: 19px;
       outline: none;
+      resize: vertical;
+      overflow: auto;
     }
     .mixedEditor:empty:before {
       content: attr(data-placeholder);
@@ -281,12 +288,15 @@
     }
     .sourcePane {
       display: grid;
-      grid-template-rows: auto auto auto 1fr;
+      grid-template-rows: auto auto auto auto;
       min-height: 0;
+      align-content: start;
+      height: auto;
     }
     .sourcePane textarea {
-      height: 100%;
-      min-height: 170px;
+      height: 220px;
+      min-height: 120px;
+      resize: vertical;
     }
     .sourcePane .meta {
       font-size: 12px;
@@ -325,7 +335,7 @@
   <div class="wrap">
     <div>
       <h1 class="titleScary">闇鍋Visualizer</h1>
-      <div class="sub">上側に混合問題文、下側に4つの問題文を入力します。通常表示では各問題文を独立に部分列として拾った位置を重ねて表示し、自動割当表示では各文字を高々1つの問題文にだけ割り当てて全問題文を実現できるか確認したうえで表示します。</div>
+      <div class="sub">上側に混合問題文、下側に4つの問題文を入力します。各ウィンドウの右下をドラッグすると縦幅を調整できます。外側の枠も一緒に伸びます。通常表示では各問題文を独立に部分列として拾った位置を重ねて表示し、自動割当表示では各文字を高々1つの問題文にだけ割り当てて全問題文を実現できるか確認したうえで表示します。</div>
     </div>
 
     <div class="panel mixedPane">
@@ -336,12 +346,17 @@
             <button id="modeOverlapBtn" class="modeBtn active">通常表示</button>
             <button id="modeAssignBtn" class="modeBtn">自動割当表示</button>
           </div>
+          <div class="modeGroup">
+            <button id="runDynamicBtn" class="modeBtn active">動的モード</button>
+            <button id="runStaticBtn" class="modeBtn">静的モード</button>
+          </div>
+          <button id="runAssignBtn" style="display:none;">自動割当を実行</button>
           <button id="plainBtn">色を消す</button>
           <button id="exampleBtn">例を表示</button>
         </div>
       </div>
       <div class="titleRow">
-        <div class="hint">この領域を直接編集できます。通常表示の複数一致は下線で表示します。自動割当表示では、入力された全問題文を本当に同時実現できる場合のみ、1つの割当を構成して表示します。</div>
+        <div class="hint">この領域を直接編集できます。通常表示の複数一致は下線で表示します。自動割当表示では、入力された全問題文を本当に同時実現できる場合のみ、1つの割当を構成して表示します。動的モードでは入力のたびに更新し、静的モードではボタンを押したときだけ更新します。</div>
         <div class="legend">
           <span class="pill"><span class="swatch" id="legend1" style="background: var(--c1)"></span><span>問題1:</span><span id="legendText1" style="color: var(--c1); font-weight: 700;">赤</span></span>
           <span class="pill"><span class="swatch" id="legend2" style="background: var(--c2)"></span><span>問題2:</span><span id="legendText2" style="color: var(--c2); font-weight: 700;">青</span></span>
@@ -422,6 +437,7 @@
     </div>
   </div>
 
+  
   <script>
     const $ = (id) => document.getElementById(id);
 
@@ -443,11 +459,11 @@
       ['#17becf', '水色'],
       ['#111111', '黒']
     ];
-
-    let currentMode = 'overlap';
-
     const COLOR_NAME = Object.fromEntries(COLOR_OPTIONS);
 
+    let currentMode = 'overlap';
+    let assignmentRunMode = 'dynamic';
+    let cachedAssignment = null;
 
     function escapeHtml(s) {
       return s
@@ -481,11 +497,15 @@
       document.documentElement.style.setProperty('--c3', colors[2]);
       document.documentElement.style.setProperty('--c4', colors[3]);
       ['legend1','legend2','legend3','legend4'].forEach((id, i) => {
-        $(id).style.background = colors[i];
+        const el = $(id);
+        if (el) el.style.background = colors[i];
       });
       ['legendText1','legendText2','legendText3','legendText4'].forEach((id, i) => {
-        $(id).style.color = colors[i];
-        $(id).textContent = COLOR_NAME[colors[i]] || '色';
+        const el = $(id);
+        if (el) {
+          el.style.color = colors[i];
+          el.textContent = COLOR_NAME[colors[i]] || '色';
+        }
       });
       updateAllColorPreviews();
     }
@@ -531,7 +551,10 @@
     }
 
     function closeAllPickers() {
-      [1,2,3,4].forEach(i => $(`picker${i}`).classList.remove('open'));
+      [1,2,3,4].forEach(i => {
+        const el = $(`picker${i}`);
+        if (el) el.classList.remove('open');
+      });
     }
 
     function updateColorPreview(idx) {
@@ -543,7 +566,7 @@
     }
 
     function updateAllColorPreviews() {
-      [1, 2, 3, 4].forEach(updateColorPreview);
+      [1,2,3,4].forEach(updateColorPreview);
     }
 
     function findGreedySubsequencePositions(source, mixed) {
@@ -590,12 +613,11 @@
 
     function renderMixed(mixed, classes) {
       if (!mixed.length) return '';
-      let html = '';
+      let out = '';
       for (let i = 0; i < mixed.length; i++) {
-        const cls = classes[i] || '';
-        html += `<span class="token ${cls}" data-idx="${i}">${escapeHtml(mixed[i])}</span>`;
+        out += `<span class="token ${classes[i] || ''}" data-idx="${i}">${escapeHtml(mixed[i])}</span>`;
       }
-      return html;
+      return out;
     }
 
     function getCaretOffset(root) {
@@ -603,7 +625,6 @@
       if (!sel || sel.rangeCount === 0) return null;
       const range = sel.getRangeAt(0);
       if (!root.contains(range.startContainer)) return null;
-
       const probe = range.cloneRange();
       probe.selectNodeContents(root);
       probe.setEnd(range.startContainer, range.startOffset);
@@ -613,7 +634,6 @@
     function setCaretOffset(root, offset) {
       const selection = window.getSelection();
       if (!selection) return;
-
       const range = document.createRange();
       let remaining = Math.max(0, offset);
 
@@ -651,80 +671,165 @@
     }
 
     function solveUniqueAssignment(mixed, sources) {
-      const m = sources.length;
-      const lens = sources.map(s => s.length);
-      const target = encodeState(lens);
+      const src = sources.map(s => Array.from(s));
+      const mix = Array.from(mixed);
+      const m = src.length;
+      const lens = src.map(s => s.length);
+      const L0 = lens[0], L1 = lens[1], L2 = lens[2], L3 = lens[3];
+      const D0 = L1 + 1;
+      const D1 = L2 + 1;
+      const D2 = L3 + 1;
+      const totalStates = (L0 + 1) * (L1 + 1) * (L2 + 1) * (L3 + 1);
 
-      let frontier = new Set([encodeState(Array(m).fill(0))]);
+      if (!Number.isFinite(totalStates) || totalStates > 20000000) {
+        return {
+          ok: false,
+          assignment: null,
+          message: '状態数が大きすぎるため、この入力では高速DPを安全に実行できません。問題文を短くするか、静的モードでお試しください。'
+        };
+      }
 
-      for (let idx = 0; idx < mixed.length; idx++) {
-        const ch = mixed[idx];
-        const next = new Set();
-        for (const key of frontier) {
-          const state = decodeState(key);
-          next.add(key);
-          for (let t = 0; t < m; t++) {
-            if (state[t] < lens[t] && sources[t][state[t]] === ch) {
-              const ns = state.slice();
-              ns[t] += 1;
-              next.add(encodeState(ns));
+      function flat(a, b, c, d) {
+        return (((a * D0) + b) * D1 + c) * D2 + d;
+      }
+
+      const posMap = new Map();
+      for (let i = 0; i < mix.length; i++) {
+        const ch = mix[i];
+        if (!posMap.has(ch)) posMap.set(ch, []);
+        posMap.get(ch).push(i);
+      }
+
+      function nextAfter(ch, pos) {
+        const arr = posMap.get(ch);
+        if (!arr) return -1;
+        let lo = 0, hi = arr.length;
+        while (lo < hi) {
+          const mid = (lo + hi) >> 1;
+          if (arr[mid] < pos) lo = mid + 1;
+          else hi = mid;
+        }
+        return lo < arr.length ? arr[lo] : -1;
+      }
+
+      const INF = mix.length + 1;
+      const best = new Uint32Array(totalStates);
+      best.fill(INF);
+      best[0] = 0;
+
+      for (let a = 0; a <= L0; a++) {
+        for (let b = 0; b <= L1; b++) {
+          for (let c = 0; c <= L2; c++) {
+            for (let d = 0; d <= L3; d++) {
+              const curIdx = flat(a, b, c, d);
+              const pos = best[curIdx];
+              if (pos === INF) continue;
+
+              if (a < L0) {
+                const p = nextAfter(src[0][a], pos);
+                if (p !== -1) {
+                  const ni = flat(a + 1, b, c, d);
+                  const np = p + 1;
+                  if (np < best[ni]) best[ni] = np;
+                }
+              }
+              if (b < L1) {
+                const p = nextAfter(src[1][b], pos);
+                if (p !== -1) {
+                  const ni = flat(a, b + 1, c, d);
+                  const np = p + 1;
+                  if (np < best[ni]) best[ni] = np;
+                }
+              }
+              if (c < L2) {
+                const p = nextAfter(src[2][c], pos);
+                if (p !== -1) {
+                  const ni = flat(a, b, c + 1, d);
+                  const np = p + 1;
+                  if (np < best[ni]) best[ni] = np;
+                }
+              }
+              if (d < L3) {
+                const p = nextAfter(src[3][d], pos);
+                if (p !== -1) {
+                  const ni = flat(a, b, c, d + 1);
+                  const np = p + 1;
+                  if (np < best[ni]) best[ni] = np;
+                }
+              }
             }
           }
         }
-        frontier = next;
       }
 
-      if (!frontier.has(target)) {
+      const targetIdx = flat(L0, L1, L2, L3);
+      if (best[targetIdx] === INF) {
         return { ok: false, assignment: null };
       }
 
-      const suffix = Array(mixed.length + 1);
-      suffix[mixed.length] = new Set([target]);
+      const assignment = Array(mix.length).fill(0);
+      let a = L0, b = L1, c = L2, d = L3;
+      let curPos = best[targetIdx];
 
-      for (let idx = mixed.length - 1; idx >= 0; idx--) {
-        const ch = mixed[idx];
-        const prevSet = new Set();
-        for (const key of suffix[idx + 1]) {
-          prevSet.add(key);
-          const state = decodeState(key);
-          for (let t = 0; t < m; t++) {
-            if (state[t] > 0 && sources[t][state[t] - 1] === ch) {
-              const ps = state.slice();
-              ps[t] -= 1;
-              prevSet.add(encodeState(ps));
+      while (a > 0 || b > 0 || c > 0 || d > 0) {
+        let found = false;
+
+        if (a > 0) {
+          const prevIdx = flat(a - 1, b, c, d);
+          const prevPos = best[prevIdx];
+          if (prevPos !== INF) {
+            const p = nextAfter(src[0][a - 1], prevPos);
+            if (p !== -1 && p + 1 === curPos) {
+              assignment[p] = 1;
+              a--;
+              curPos = prevPos;
+              found = true;
             }
           }
         }
-        suffix[idx] = prevSet;
-      }
-
-      let assignment = Array(mixed.length).fill(0);
-      let state = Array(m).fill(0);
-
-      for (let idx = 0; idx < mixed.length; idx++) {
-        const ch = mixed[idx];
-        let chosen = 0;
-        for (let t = 0; t < m; t++) {
-          if (state[t] < lens[t] && sources[t][state[t]] === ch) {
-            const ns = state.slice();
-            ns[t] += 1;
-            if (suffix[idx + 1].has(encodeState(ns))) {
-              chosen = t + 1;
-              state = ns;
-              break;
+        if (!found && b > 0) {
+          const prevIdx = flat(a, b - 1, c, d);
+          const prevPos = best[prevIdx];
+          if (prevPos !== INF) {
+            const p = nextAfter(src[1][b - 1], prevPos);
+            if (p !== -1 && p + 1 === curPos) {
+              assignment[p] = 2;
+              b--;
+              curPos = prevPos;
+              found = true;
             }
           }
         }
-        if (chosen === 0) {
-          if (!suffix[idx + 1].has(encodeState(state))) {
-            return { ok: false, assignment: null };
+        if (!found && c > 0) {
+          const prevIdx = flat(a, b, c - 1, d);
+          const prevPos = best[prevIdx];
+          if (prevPos !== INF) {
+            const p = nextAfter(src[2][c - 1], prevPos);
+            if (p !== -1 && p + 1 === curPos) {
+              assignment[p] = 3;
+              c--;
+              curPos = prevPos;
+              found = true;
+            }
           }
         }
-        assignment[idx] = chosen;
-      }
+        if (!found && d > 0) {
+          const prevIdx = flat(a, b, c, d - 1);
+          const prevPos = best[prevIdx];
+          if (prevPos !== INF) {
+            const p = nextAfter(src[3][d - 1], prevPos);
+            if (p !== -1 && p + 1 === curPos) {
+              assignment[p] = 4;
+              d--;
+              curPos = prevPos;
+              found = true;
+            }
+          }
+        }
 
-      if (encodeState(state) !== target) {
-        return { ok: false, assignment: null };
+        if (!found) {
+          return { ok: false, assignment: null, message: '復元に失敗しました。' };
+        }
       }
 
       return { ok: true, assignment };
@@ -732,9 +837,8 @@
 
     function renderOverlapMode(mixed, sources) {
       const masks = buildOverlapMasks(mixed, sources);
-      const classes = masks.map(classNameFromMask);
       return {
-        classes,
+        classes: masks.map(classNameFromMask),
         statusText: '通常表示: 各問題文を独立に部分列として読んだ位置を重ねて表示しています。',
         statusKind: 'ok'
       };
@@ -742,48 +846,78 @@
 
     function renderAssignmentMode(mixed, sources) {
       const nonEmpty = sources.filter(s => s.length > 0).length;
-      if (nonEmpty === 0) {
-        return { classes: Array(mixed.length).fill(''), statusText: '', statusKind: '' };
-      }
+      if (nonEmpty === 0) return { classes: Array(mixed.length).fill(''), statusText: '', statusKind: '' };
       const result = solveUniqueAssignment(mixed, sources);
       if (!result.ok) {
         return {
           classes: Array(mixed.length).fill(''),
-          statusText: '自動割当表示: 各文字を高々1つの問題へ割り当てる形では、入力された全問題文を最後まで実現できません。',
+          statusText: result.message || '自動割当表示: 各文字を高々1つの問題へ割り当てる形では、入力された全問題文を最後まで実現できません。',
           statusKind: 'ng'
         };
       }
-      const classes = result.assignment.map((x) =>
-        x === 1 ? 'seg1' : x === 2 ? 'seg2' : x === 3 ? 'seg3' : x === 4 ? 'seg4' : ''
-      );
       return {
-        classes,
+        classes: result.assignment.map(x => x === 1 ? 'seg1' : x === 2 ? 'seg2' : x === 3 ? 'seg3' : x === 4 ? 'seg4' : ''),
         statusText: '自動割当表示: 割当可能であることを確認し、実際に1つの割当を構成して表示しています。',
         statusKind: 'ok'
       };
+    }
+
+    function cacheSignature() {
+      return JSON.stringify({ mixed: getMixedText(), sources: getSources() });
+    }
+
+    function recomputeAssignmentRender() {
+      cachedAssignment = {
+        signature: cacheSignature(),
+        result: renderAssignmentMode(getMixedText(), getSources())
+      };
+      return cachedAssignment.result;
     }
 
     function setMode(mode) {
       currentMode = mode;
       $('modeOverlapBtn').classList.toggle('active', mode === 'overlap');
       $('modeAssignBtn').classList.toggle('active', mode === 'assign');
+      $('runAssignBtn').style.display = (mode === 'assign' && assignmentRunMode === 'static') ? '' : 'none';
       refreshHighlight(false);
+    }
+
+    function setAssignmentRunMode(mode) {
+      assignmentRunMode = mode;
+      $('runDynamicBtn').classList.toggle('active', mode === 'dynamic');
+      $('runStaticBtn').classList.toggle('active', mode === 'static');
+      $('runAssignBtn').style.display = (currentMode === 'assign' && mode === 'static') ? '' : 'none';
     }
 
     function refreshHighlight(preserveCaret = false) {
       const editor = $('mixedEditor');
       const mixed = getMixedText();
-      const sources = getSources();
       const caret = preserveCaret ? getCaretOffset(editor) : null;
-
       applyThemeColors();
 
-      const result = currentMode === 'assign'
-        ? renderAssignmentMode(mixed, sources)
-        : renderOverlapMode(mixed, sources);
+      let result;
+      if (currentMode === 'assign') {
+        if (assignmentRunMode === 'dynamic') {
+          result = recomputeAssignmentRender();
+        } else {
+          const sig = cacheSignature();
+          if (cachedAssignment && cachedAssignment.signature === sig) {
+            result = cachedAssignment.result;
+          } else {
+            result = {
+              classes: Array(mixed.length).fill(''),
+              statusText: cachedAssignment
+                ? '静的モード: 入力が変更されました。「自動割当を実行」を押して更新してください。'
+                : '静的モード: 「自動割当を実行」を押すと自動割当を計算します。',
+              statusKind: ''
+            };
+          }
+        }
+      } else {
+        result = renderOverlapMode(mixed, getSources());
+      }
 
       editor.innerHTML = renderMixed(mixed, result.classes);
-
       const status = $('statusText');
       status.textContent = result.statusText || '';
       status.classList.remove('ok', 'ng');
@@ -801,9 +935,7 @@
       setMixedText(text);
       $('statusText').textContent = '';
       $('statusText').classList.remove('ok', 'ng');
-      if (caret !== null) {
-        setCaretOffset(editor, Math.min(caret, text.length));
-      }
+      if (caret !== null) setCaretOffset(editor, Math.min(caret, text.length));
     }
 
     function loadExample() {
@@ -813,6 +945,10 @@
       $('src4').value = EXAMPLE_4;
       setMixedText(EXAMPLE_MIXED);
       refreshHighlight(false);
+    }
+
+    function invalidateAssignmentCache() {
+      cachedAssignment = null;
     }
 
     populateColorSelect('color1', '#ff0000');
@@ -825,18 +961,42 @@
     buildColorPicker(4);
 
     ['src1', 'src2', 'src3', 'src4'].forEach((id) => {
-      $(id).addEventListener('input', () => refreshHighlight(false));
+      $(id).addEventListener('input', () => {
+        invalidateAssignmentCache();
+        refreshHighlight(false);
+      });
     });
+
     document.addEventListener('click', () => closeAllPickers());
 
-    $('mixedEditor').addEventListener('input', () => refreshHighlight(true));
+    $('mixedEditor').addEventListener('input', () => {
+      invalidateAssignmentCache();
+      refreshHighlight(true);
+    });
     $('plainBtn').addEventListener('click', clearHighlight);
-    $('exampleBtn').addEventListener('click', loadExample);
+    $('exampleBtn').addEventListener('click', () => {
+      invalidateAssignmentCache();
+      loadExample();
+    });
     $('modeOverlapBtn').addEventListener('click', () => setMode('overlap'));
     $('modeAssignBtn').addEventListener('click', () => setMode('assign'));
+    $('runDynamicBtn').addEventListener('click', () => {
+      setAssignmentRunMode('dynamic');
+      refreshHighlight(false);
+    });
+    $('runStaticBtn').addEventListener('click', () => {
+      setAssignmentRunMode('static');
+      refreshHighlight(false);
+    });
+    $('runAssignBtn').addEventListener('click', () => {
+      recomputeAssignmentRender();
+      refreshHighlight(false);
+    });
 
     setMixedText('');
+    setAssignmentRunMode('dynamic');
     refreshHighlight(false);
   </script>
+
 </body>
 </html>
