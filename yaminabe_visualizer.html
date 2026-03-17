@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>問題文ミックス・ビジュアライザ</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --panel: #ffffff;
+      --panel-soft: #f7f8fb;
+      --text: #1a1a1a;
+      --muted: #667085;
+      --line: #d0d5dd;
+      --c1: #ff0000;
+      --c2: #0000ff;
+      --c3: #40BA8D;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .wrap {
+      width: min(1700px, 100vw);
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 12px;
+      display: grid;
+      grid-template-rows: auto 1.35fr 0.85fr;
+      gap: 12px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.2;
+    }
+    .sub {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+      margin-top: 4px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 14px;
+      min-height: 0;
+      box-shadow: 0 2px 10px rgba(16, 24, 40, 0.05);
+    }
+    .bottom {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      min-height: 0;
+    }
+    .titleRow {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    .title {
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 5px 10px;
+      background: var(--panel-soft);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .swatch {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .controls {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .modeGroup {
+      display: inline-flex;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      overflow: hidden;
+      background: #ffffff;
+    }
+    .modeBtn {
+      border: none;
+      border-right: 1px solid var(--line);
+      border-radius: 0;
+      background: transparent;
+      padding: 9px 14px;
+    }
+    .modeBtn:last-child { border-right: none; }
+    .modeBtn.active {
+      background: #eef2ff;
+      color: #111827;
+    }
+    .statusText {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 8px;
+      min-height: 1.5em;
+    }
+    .statusText.ok { color: #067647; }
+    .statusText.ng { color: #b42318; }
+    button {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 9px 14px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      background: #f3f4f6;
+      color: #111827;
+    }
+    button:hover { background: #e5e7eb; }
+    textarea {
+      width: 100%;
+      background: #ffffff;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      resize: none;
+      font: inherit;
+      line-height: 1.7;
+    }
+    .mixedPane {
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      min-height: 0;
+    }
+    .hint {
+      color: var(--muted);
+      font-size: 12px;
+      margin: 0 0 8px;
+    }
+    .mixedEditor {
+      min-height: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      line-height: 1.95;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 19px;
+      outline: none;
+    }
+    .mixedEditor:empty:before {
+      content: attr(data-placeholder);
+      color: #98a2b3;
+    }
+    .sourcePane {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      min-height: 0;
+    }
+    .sourcePane textarea {
+      height: 100%;
+      min-height: 220px;
+    }
+    .sourcePane .meta {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 6px 0 8px;
+    }
+    .token {
+      transition: color 0.12s ease;
+      color: var(--text);
+    }
+    .seg1 { color: var(--c1); font-weight: 700; }
+    .seg2 { color: var(--c2); font-weight: 700; }
+    .seg3 { color: var(--c3); font-weight: 700; }
+    .multi {
+      font-weight: 800;
+      text-decoration: underline;
+      text-decoration-thickness: 2px;
+    }
+    @media (max-width: 1100px) {
+      .wrap { grid-template-rows: auto auto auto; }
+      .bottom { grid-template-columns: 1fr; }
+      .mixedEditor, .sourcePane textarea { min-height: 240px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div>
+      <h1>問題文ミックス・ビジュアライザ</h1>
+      <div class="sub">上側に混合問題文、下側に3つの問題文を入力します。下の各枠に文字を入力すると、その文字列を部分列として読める混合問題文中の対応文字が即時に着色されます。</div>
+    </div>
+
+    <div class="panel mixedPane">
+      <div class="titleRow">
+        <div class="title">混合問題文</div>
+        <div class="controls">
+          <div class="modeGroup">
+            <button id="modeOverlapBtn" class="modeBtn active">通常表示</button>
+            <button id="modeAssignBtn" class="modeBtn">自動割当表示</button>
+          </div>
+          <button id="plainBtn">色を消す</button>
+          <button id="exampleBtn">例を再読み込み</button>
+        </div>
+      </div>
+      <div class="titleRow">
+        <div class="hint">この領域を直接編集できます。通常表示では各問題文ごとに部分列として拾われる位置を重ねて表示します。自動割当表示では、各文字を高々1つの問題に割り当てて3本すべてを成立させられる場合のみ、その割当で表示します。</div>
+        <div class="legend">
+          <span class="pill"><span class="swatch" style="background: var(--c1)"></span><span>問題1</span></span>
+          <span class="pill"><span class="swatch" style="background: var(--c2)"></span><span>問題2</span></span>
+          <span class="pill"><span class="swatch" style="background: var(--c3)"></span><span>問題3</span></span>
+          <span class="pill"><span>通常表示の複数一致は下線</span></span>
+        </div>
+      </div>
+      <div id="mixedEditor" class="mixedEditor" contenteditable="true" spellcheck="false" data-placeholder="ここに混合問題文を入力してください。"></div>
+      <div id="statusText" class="statusText"></div>
+    </div>
+
+    <div class="bottom">
+      <div class="panel sourcePane">
+        <div class="title">問題文 1</div>
+        <div class="meta">入力した文字列が混合問題文中のどこで読めるかを赤で表示します。</div>
+        <textarea id="src1"></textarea>
+      </div>
+      <div class="panel sourcePane">
+        <div class="title">問題文 2</div>
+        <div class="meta">入力した文字列が混合問題文中のどこで読めるかを青で表示します。</div>
+        <textarea id="src2"></textarea>
+      </div>
+      <div class="panel sourcePane">
+        <div class="title">問題文 3</div>
+        <div class="meta">入力した文字列が混合問題文中のどこで読めるかを緑青で表示します。</div>
+        <textarea id="src3"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    const EXAMPLE_1 = '正の整数Xに対して、Xを2進表記したときに末尾に連続する0の個数(の最大値)をY(X)で表します。ただし、Xを2進表記したとき末尾が1ならばY(X)=0です。正の整数Nが与えられるので、Y(N)を出力してください。';
+    const EXAMPLE_2 = '非負整数の組(X,Y,Z)であって、X+Y+Z≤Nを満たすものをNの良い組と呼びます。正の整数Nが与えられるので、Nの良い組を辞書順で小さい方から順に全て出力してください。';
+    const EXAMPLE_3 = '縦100マス、横100マスのマス目があります。マス目の上からX行目、左からY列目のマスにはX×Yが書かれています。整数Nが与えられるので、マス目に書かれた整数のうちNでないものの総和を求めてください。';
+    const EXAMPLE_MIXED = '正縦1の非0負0マ整整数の組(ス、横数1X0に0マX対スしての、マX,を2ス進Y目,が表Z記あしり)でたとまきあにって、X末す尾+。マY+Z≤ス目のN上にからX連を続満たす行もする目、左かのらY0の列目個数をNの(マスの良にの最いは大値組X)×をYがYと呼(X書)かでれ表てしまいすまび。す。整ま数たす。N正がの整数与えNられがだる与しの、えXらで、れを2進る表記のマしでたス、目ときNにの良い書組辞末尾かが1ならば書順でY(れX)た小さい整=0数ですの方。正うの整か数NちがらN与えら順でれないにもるのので、Yの全総和てを(N)を求め出力てく出し力してくてくだださだささいいい。。。';
+
+    let currentMode = 'overlap';
+
+    function escapeHtml(s) {
+      return s
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function getMixedText() {
+      return $('mixedEditor').innerText.replace(/\u00A0/g, '');
+    }
+
+    function setMixedText(text) {
+      $('mixedEditor').textContent = text;
+    }
+
+    function getSources() {
+      return [$('src1').value, $('src2').value, $('src3').value];
+    }
+
+    function findGreedySubsequencePositions(source, mixed) {
+      const pos = [];
+      if (!source.length || !mixed.length) return pos;
+      let j = 0;
+      for (let i = 0; i < source.length; i++) {
+        while (j < mixed.length && mixed[j] !== source[i]) j++;
+        if (j === mixed.length) break;
+        pos.push(j);
+        j++;
+      }
+      return pos;
+    }
+
+    function buildOverlapMasks(mixed, sources) {
+      const masks = Array(mixed.length).fill(0);
+      sources.forEach((src, idx) => {
+        const positions = findGreedySubsequencePositions(src, mixed);
+        const bit = 1 << idx;
+        positions.forEach((p) => {
+          masks[p] |= bit;
+        });
+      });
+      return masks;
+    }
+
+    function classNameFromMask(mask) {
+      if (mask === 1) return 'seg1';
+      if (mask === 2) return 'seg2';
+      if (mask === 4) return 'seg3';
+      if (mask === 3) return 'seg1 multi';
+      if (mask === 5) return 'seg1 multi';
+      if (mask === 6) return 'seg2 multi';
+      if (mask === 7) return 'seg1 multi';
+      return '';
+    }
+
+    function renderMixed(mixed, classes) {
+      if (!mixed.length) return '';
+      let html = '';
+      for (let i = 0; i < mixed.length; i++) {
+        const cls = classes[i] || '';
+        html += `<span class="token ${cls}" data-idx="${i}">${escapeHtml(mixed[i])}</span>`;
+      }
+      return html;
+    }
+
+    function getCaretOffset(root) {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return null;
+      const range = sel.getRangeAt(0);
+      if (!root.contains(range.startContainer)) return null;
+
+      const probe = range.cloneRange();
+      probe.selectNodeContents(root);
+      probe.setEnd(range.startContainer, range.startOffset);
+      return probe.toString().length;
+    }
+
+    function setCaretOffset(root, offset) {
+      const selection = window.getSelection();
+      if (!selection) return;
+
+      const range = document.createRange();
+      let remaining = Math.max(0, offset);
+
+      function walk(node) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          const len = node.textContent.length;
+          if (remaining <= len) {
+            range.setStart(node, remaining);
+            range.collapse(true);
+            return true;
+          }
+          remaining -= len;
+          return false;
+        }
+        for (const child of node.childNodes) {
+          if (walk(child)) return true;
+        }
+        return false;
+      }
+
+      if (!walk(root)) {
+        range.selectNodeContents(root);
+        range.collapse(false);
+      }
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+
+    function encodeState(a, b, c) {
+      return `${a}|${b}|${c}`;
+    }
+
+    function decodeState(key) {
+      return key.split('|').map(Number);
+    }
+
+    function pruneDominated(stateKeys) {
+      const arr = Array.from(stateKeys, decodeState);
+      const keep = [];
+      for (let i = 0; i < arr.length; i++) {
+        let dominated = false;
+        for (let j = 0; j < arr.length; j++) {
+          if (i === j) continue;
+          if (arr[j][0] >= arr[i][0] && arr[j][1] >= arr[i][1] && arr[j][2] >= arr[i][2] &&
+              (arr[j][0] > arr[i][0] || arr[j][1] > arr[i][1] || arr[j][2] > arr[i][2])) {
+            dominated = true;
+            break;
+          }
+        }
+        if (!dominated) keep.push(encodeState(arr[i][0], arr[i][1], arr[i][2]));
+      }
+      return keep;
+    }
+
+    function solveUniqueAssignment(mixed, sources) {
+      const lens = sources.map((s) => s.length);
+      const target = encodeState(lens[0], lens[1], lens[2]);
+      let frontier = new Set([encodeState(0, 0, 0)]);
+      const parents = [];
+
+      for (let idx = 0; idx < mixed.length; idx++) {
+        const ch = mixed[idx];
+        const candidateMap = new Map();
+
+        function offer(nextKey, prevKey, action) {
+          if (!candidateMap.has(nextKey)) {
+            candidateMap.set(nextKey, { prev: prevKey, action });
+          }
+        }
+
+        for (const key of frontier) {
+          const [a, b, c] = decodeState(key);
+          offer(key, key, 0);
+          if (a < lens[0] && sources[0][a] === ch) offer(encodeState(a + 1, b, c), key, 1);
+          if (b < lens[1] && sources[1][b] === ch) offer(encodeState(a, b + 1, c), key, 2);
+          if (c < lens[2] && sources[2][c] === ch) offer(encodeState(a, b, c + 1), key, 3);
+        }
+
+        const prunedKeys = pruneDominated(candidateMap.keys());
+        const nextParents = new Map();
+        for (const key of prunedKeys) {
+          nextParents.set(key, candidateMap.get(key));
+        }
+        parents.push(nextParents);
+        frontier = new Set(prunedKeys);
+      }
+
+      if (!frontier.has(target)) {
+        return { ok: false, assignment: null };
+      }
+
+      const assignment = Array(mixed.length).fill(0);
+      let cur = target;
+      for (let idx = mixed.length - 1; idx >= 0; idx--) {
+        const info = parents[idx].get(cur);
+        if (!info) {
+          return { ok: false, assignment: null };
+        }
+        assignment[idx] = info.action;
+        cur = info.prev;
+      }
+      return { ok: true, assignment };
+    }
+
+    function renderOverlapMode(mixed, sources) {
+      const masks = buildOverlapMasks(mixed, sources);
+      const classes = masks.map(classNameFromMask);
+      return {
+        classes,
+        statusText: '通常表示: 各問題文を独立に部分列として読んだ位置を重ねて表示しています。',
+        statusKind: 'ok'
+      };
+    }
+
+    function renderAssignmentMode(mixed, sources) {
+      const result = solveUniqueAssignment(mixed, sources);
+      if (!result.ok) {
+        return {
+          classes: Array(mixed.length).fill(''),
+          statusText: '自動割当表示: 各文字を高々1つの問題へ割り当てる形では、3つすべてを最後まで実現できません。',
+          statusKind: 'ng'
+        };
+      }
+      const classes = result.assignment.map((x) => x === 1 ? 'seg1' : x === 2 ? 'seg2' : x === 3 ? 'seg3' : '');
+      return {
+        classes,
+        statusText: '自動割当表示: 割当可能であることを確認し、実際に1つの割当を構成して表示しています。',
+        statusKind: 'ok'
+      };
+    }
+
+    function setMode(mode) {
+      currentMode = mode;
+      $('modeOverlapBtn').classList.toggle('active', mode === 'overlap');
+      $('modeAssignBtn').classList.toggle('active', mode === 'assign');
+      refreshHighlight(false);
+    }
+
+    function refreshHighlight(preserveCaret = false) {
+      const editor = $('mixedEditor');
+      const mixed = getMixedText();
+      const sources = getSources();
+      const caret = preserveCaret ? getCaretOffset(editor) : null;
+
+      let result;
+      if (currentMode === 'assign') {
+        result = renderAssignmentMode(mixed, sources);
+      } else {
+        result = renderOverlapMode(mixed, sources);
+      }
+
+      editor.innerHTML = renderMixed(mixed, result.classes);
+
+      const status = $('statusText');
+      status.textContent = result.statusText || '';
+      status.classList.remove('ok', 'ng');
+      if (result.statusKind) status.classList.add(result.statusKind);
+
+      if (preserveCaret && caret !== null) {
+        setCaretOffset(editor, Math.min(caret, mixed.length));
+      }
+    }
+
+    function clearHighlight() {
+      const editor = $('mixedEditor');
+      const text = getMixedText();
+      const caret = getCaretOffset(editor);
+      setMixedText(text);
+      $('statusText').textContent = '';
+      $('statusText').classList.remove('ok', 'ng');
+      if (caret !== null) {
+        setCaretOffset(editor, Math.min(caret, text.length));
+      }
+    }
+
+    function loadExample() {
+      $('src1').value = EXAMPLE_1;
+      $('src2').value = EXAMPLE_2;
+      $('src3').value = EXAMPLE_3;
+      setMixedText(EXAMPLE_MIXED);
+      refreshHighlight(false);
+    }
+
+    ['src1', 'src2', 'src3'].forEach((id) => {
+      $(id).addEventListener('input', () => refreshHighlight(false));
+    });
+    $('mixedEditor').addEventListener('input', () => refreshHighlight(true));
+    $('plainBtn').addEventListener('click', clearHighlight);
+    $('exampleBtn').addEventListener('click', loadExample);
+    $('modeOverlapBtn').addEventListener('click', () => setMode('overlap'));
+    $('modeAssignBtn').addEventListener('click', () => setMode('assign'));
+
+    setMixedText('');
+    refreshHighlight(false);
+  </script>
+</body>
+</html>
