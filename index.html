@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>問題文ミックス・ビジュアライザ</title>
+  <title>闇鍋Visualizer</title>
   <style>
     :root {
       --bg: #ffffff;
@@ -15,6 +15,7 @@
       --c1: #ff0000;
       --c2: #0000ff;
       --c3: #40BA8D;
+      --c4: #984ea3;
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; }
@@ -30,7 +31,7 @@
       margin: 0 auto;
       padding: 12px;
       display: grid;
-      grid-template-rows: auto 1.35fr 0.85fr;
+      grid-template-rows: auto 1.2fr 1fr;
       gap: 12px;
     }
     h1 {
@@ -38,11 +39,40 @@
       font-size: 24px;
       line-height: 1.2;
     }
+    .titleScary {
+      position: relative;
+      display: inline-block;
+      font-size: 34px;
+      letter-spacing: 0.06em;
+      color: #fafafa;
+      text-shadow:
+        0 0 1px #ffffff,
+        0 0 6px rgba(180, 0, 0, 0.55),
+        0 0 14px rgba(120, 0, 0, 0.35),
+        2px 2px 0 rgba(0, 0, 0, 0.65);
+      padding: 8px 16px;
+      border-radius: 12px;
+      background:
+        linear-gradient(180deg, #2a0d0d 0%, #140909 100%);
+      border: 1px solid #4a1b1b;
+      box-shadow:
+        inset 0 0 18px rgba(255, 255, 255, 0.04),
+        0 4px 18px rgba(0, 0, 0, 0.22);
+    }
+    .titleScary::before {
+      content: "";
+      position: absolute;
+      inset: -2px;
+      border-radius: 14px;
+      pointer-events: none;
+      box-shadow: 0 0 20px rgba(160, 0, 0, 0.18);
+    }
     .sub {
-      color: var(--muted);
+      color: #6b7280;
       font-size: 13px;
       line-height: 1.5;
-      margin-top: 4px;
+      margin-top: 8px;
+      margin-left: 2px;
     }
     .panel {
       background: var(--panel);
@@ -54,7 +84,7 @@
     }
     .bottom {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-columns: 1fr 1fr;
       gap: 12px;
       min-height: 0;
     }
@@ -105,6 +135,17 @@
       overflow: hidden;
       background: #ffffff;
     }
+    button {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 9px 14px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      background: #f3f4f6;
+      color: #111827;
+    }
+    button:hover { background: #e5e7eb; }
     .modeBtn {
       border: none;
       border-right: 1px solid var(--line);
@@ -117,25 +158,6 @@
       background: #eef2ff;
       color: #111827;
     }
-    .statusText {
-      font-size: 12px;
-      color: var(--muted);
-      margin-top: 8px;
-      min-height: 1.5em;
-    }
-    .statusText.ok { color: #067647; }
-    .statusText.ng { color: #b42318; }
-    button {
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 9px 14px;
-      font: inherit;
-      font-weight: 700;
-      cursor: pointer;
-      background: #f3f4f6;
-      color: #111827;
-    }
-    button:hover { background: #e5e7eb; }
     textarea {
       width: 100%;
       background: #ffffff;
@@ -147,9 +169,90 @@
       font: inherit;
       line-height: 1.7;
     }
+    select.colorSelect {
+      width: 100%;
+      background: #ffffff;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font: inherit;
+      margin: 6px 0 8px;
+    }
+    .colorPreviewSwatch {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 1px solid rgba(0,0,0,0.12);
+      display: inline-block;
+      flex: 0 0 auto;
+    }
+    .colorPicker {
+      position: relative;
+      margin: 6px 0 8px;
+    }
+    .colorPickerBtn {
+      width: 100%;
+      background: #ffffff;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font: inherit;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      cursor: pointer;
+    }
+    .colorPickerBtnLeft {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .colorPickerMenu {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(100% + 6px);
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(16,24,40,0.12);
+      padding: 6px;
+      z-index: 20;
+      display: none;
+      max-height: 240px;
+      overflow: auto;
+    }
+    .colorPicker.open .colorPickerMenu {
+      display: block;
+    }
+    .colorOption {
+      width: 100%;
+      border: none;
+      background: transparent;
+      border-radius: 8px;
+      padding: 8px 10px;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+    .colorOption:hover {
+      background: #f3f4f6;
+    }
+    .caret {
+      color: var(--muted);
+      font-size: 12px;
+      flex: 0 0 auto;
+    }
+
     .mixedPane {
       display: grid;
-      grid-template-rows: auto auto 1fr;
+      grid-template-rows: auto auto 1fr auto;
       min-height: 0;
     }
     .hint {
@@ -178,17 +281,17 @@
     }
     .sourcePane {
       display: grid;
-      grid-template-rows: auto 1fr;
+      grid-template-rows: auto auto auto 1fr;
       min-height: 0;
     }
     .sourcePane textarea {
       height: 100%;
-      min-height: 220px;
+      min-height: 170px;
     }
     .sourcePane .meta {
       font-size: 12px;
       color: var(--muted);
-      margin: 6px 0 8px;
+      margin: 6px 0 2px;
     }
     .token {
       transition: color 0.12s ease;
@@ -197,23 +300,32 @@
     .seg1 { color: var(--c1); font-weight: 700; }
     .seg2 { color: var(--c2); font-weight: 700; }
     .seg3 { color: var(--c3); font-weight: 700; }
+    .seg4 { color: var(--c4); font-weight: 700; }
     .multi {
       font-weight: 800;
       text-decoration: underline;
       text-decoration-thickness: 2px;
     }
+    .statusText {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 8px;
+      min-height: 1.5em;
+    }
+    .statusText.ok { color: #067647; }
+    .statusText.ng { color: #b42318; }
     @media (max-width: 1100px) {
       .wrap { grid-template-rows: auto auto auto; }
       .bottom { grid-template-columns: 1fr; }
-      .mixedEditor, .sourcePane textarea { min-height: 240px; }
+      .mixedEditor, .sourcePane textarea { min-height: 220px; }
     }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div>
-      <h1>問題文ミックス・ビジュアライザ</h1>
-      <div class="sub">上側に混合問題文、下側に3つの問題文を入力します。下の各枠に文字を入力すると、その文字列を部分列として読める混合問題文中の対応文字が即時に着色されます。</div>
+      <h1 class="titleScary">闇鍋Visualizer</h1>
+      <div class="sub">上側に混合問題文、下側に4つの問題文を入力します。通常表示では各問題文を独立に部分列として拾った位置を重ねて表示し、自動割当表示では各文字を高々1つの問題文にだけ割り当てて全問題文を実現できるか確認したうえで表示します。</div>
     </div>
 
     <div class="panel mixedPane">
@@ -225,15 +337,16 @@
             <button id="modeAssignBtn" class="modeBtn">自動割当表示</button>
           </div>
           <button id="plainBtn">色を消す</button>
-          <button id="exampleBtn">例を再読み込み</button>
+          <button id="exampleBtn">例を表示</button>
         </div>
       </div>
       <div class="titleRow">
-        <div class="hint">この領域を直接編集できます。通常表示では各問題文ごとに部分列として拾われる位置を重ねて表示します。自動割当表示では、各文字を高々1つの問題に割り当てて3本すべてを成立させられる場合のみ、その割当で表示します。</div>
+        <div class="hint">この領域を直接編集できます。通常表示の複数一致は下線で表示します。自動割当表示では、入力された全問題文を本当に同時実現できる場合のみ、1つの割当を構成して表示します。</div>
         <div class="legend">
-          <span class="pill"><span class="swatch" style="background: var(--c1)"></span><span>問題1</span></span>
-          <span class="pill"><span class="swatch" style="background: var(--c2)"></span><span>問題2</span></span>
-          <span class="pill"><span class="swatch" style="background: var(--c3)"></span><span>問題3</span></span>
+          <span class="pill"><span class="swatch" id="legend1" style="background: var(--c1)"></span><span>問題1:</span><span id="legendText1" style="color: var(--c1); font-weight: 700;">赤</span></span>
+          <span class="pill"><span class="swatch" id="legend2" style="background: var(--c2)"></span><span>問題2:</span><span id="legendText2" style="color: var(--c2); font-weight: 700;">青</span></span>
+          <span class="pill"><span class="swatch" id="legend3" style="background: var(--c3)"></span><span>問題3:</span><span id="legendText3" style="color: var(--c3); font-weight: 700;">緑青</span></span>
+          <span class="pill"><span class="swatch" id="legend4" style="background: var(--c4)"></span><span>問題4:</span><span id="legendText4" style="color: var(--c4); font-weight: 700;">紫</span></span>
           <span class="pill"><span>通常表示の複数一致は下線</span></span>
         </div>
       </div>
@@ -244,18 +357,67 @@
     <div class="bottom">
       <div class="panel sourcePane">
         <div class="title">問題文 1</div>
-        <div class="meta">入力した文字列が混合問題文中のどこで読めるかを赤で表示します。</div>
+        <div class="meta">入力した文字列が混合問題文中のどこで読めるかを表示します。</div>
+        <div class="colorPicker" id="picker1">
+          <button type="button" class="colorPickerBtn" id="pickerBtn1">
+            <span class="colorPickerBtnLeft">
+              <span class="colorPreviewSwatch" id="pickerSwatch1"></span>
+              <span id="pickerLabel1">色</span>
+            </span>
+            <span class="caret">▼</span>
+          </button>
+          <div class="colorPickerMenu" id="pickerMenu1"></div>
+          <select id="color1" class="colorSelect" style="display:none;"></select>
+        </div>
         <textarea id="src1"></textarea>
       </div>
       <div class="panel sourcePane">
         <div class="title">問題文 2</div>
-        <div class="meta">入力した文字列が混合問題文中のどこで読めるかを青で表示します。</div>
+        <div class="meta">入力した文字列が混合問題文中のどこで読めるかを表示します。</div>
+        <div class="colorPicker" id="picker2">
+          <button type="button" class="colorPickerBtn" id="pickerBtn2">
+            <span class="colorPickerBtnLeft">
+              <span class="colorPreviewSwatch" id="pickerSwatch2"></span>
+              <span id="pickerLabel2">色</span>
+            </span>
+            <span class="caret">▼</span>
+          </button>
+          <div class="colorPickerMenu" id="pickerMenu2"></div>
+          <select id="color2" class="colorSelect" style="display:none;"></select>
+        </div>
         <textarea id="src2"></textarea>
       </div>
       <div class="panel sourcePane">
         <div class="title">問題文 3</div>
-        <div class="meta">入力した文字列が混合問題文中のどこで読めるかを緑青で表示します。</div>
+        <div class="meta">入力した文字列が混合問題文中のどこで読めるかを表示します。</div>
+        <div class="colorPicker" id="picker3">
+          <button type="button" class="colorPickerBtn" id="pickerBtn3">
+            <span class="colorPickerBtnLeft">
+              <span class="colorPreviewSwatch" id="pickerSwatch3"></span>
+              <span id="pickerLabel3">色</span>
+            </span>
+            <span class="caret">▼</span>
+          </button>
+          <div class="colorPickerMenu" id="pickerMenu3"></div>
+          <select id="color3" class="colorSelect" style="display:none;"></select>
+        </div>
         <textarea id="src3"></textarea>
+      </div>
+      <div class="panel sourcePane">
+        <div class="title">問題文 4</div>
+        <div class="meta">入力した文字列が混合問題文中のどこで読めるかを表示します。</div>
+        <div class="colorPicker" id="picker4">
+          <button type="button" class="colorPickerBtn" id="pickerBtn4">
+            <span class="colorPickerBtnLeft">
+              <span class="colorPreviewSwatch" id="pickerSwatch4"></span>
+              <span id="pickerLabel4">色</span>
+            </span>
+            <span class="caret">▼</span>
+          </button>
+          <div class="colorPickerMenu" id="pickerMenu4"></div>
+          <select id="color4" class="colorSelect" style="display:none;"></select>
+        </div>
+        <textarea id="src4"></textarea>
       </div>
     </div>
   </div>
@@ -263,12 +425,29 @@
   <script>
     const $ = (id) => document.getElementById(id);
 
-    const EXAMPLE_1 = '正の整数Xに対して、Xを2進表記したときに末尾に連続する0の個数(の最大値)をY(X)で表します。ただし、Xを2進表記したとき末尾が1ならばY(X)=0です。正の整数Nが与えられるので、Y(N)を出力してください。';
-    const EXAMPLE_2 = '非負整数の組(X,Y,Z)であって、X+Y+Z≤Nを満たすものをNの良い組と呼びます。正の整数Nが与えられるので、Nの良い組を辞書順で小さい方から順に全て出力してください。';
-    const EXAMPLE_3 = '縦100マス、横100マスのマス目があります。マス目の上からX行目、左からY列目のマスにはX×Yが書かれています。整数Nが与えられるので、マス目に書かれた整数のうちNでないものの総和を求めてください。';
-    const EXAMPLE_MIXED = '正縦1の非0負0マ整整数の組(ス、横数1X0に0マX対スしての、マX,を2ス進Y目,が表Z記あしり)でたとまきあにって、X末す尾+。マY+Z≤ス目のN上にからX連を続満たす行もする目、左かのらY0の列目個数をNの(マスの良にの最いは大値組X)×をYがYと呼(X書)かでれ表てしまいすまび。す。整ま数たす。N正がの整数与えNられがだる与しの、えXらで、れを2進る表記のマしでたス、目ときNにの良い書組辞末尾かが1ならば書順でY(れX)た小さい整=0数ですの方。正うの整か数NちがらN与えら順でれないにもるのので、Yの全総和てを(N)を求め出力てく出し力してくてくだださだささいいい。。。';
+    const EXAMPLE_1 = '文字列Sが与えられます。Sを2回繰り返して連結させた文字列を出力してください。';
+    const EXAMPLE_2 = '正整数Nが与えられます。Nを2倍して得られる整数を求めてください。';
+    const EXAMPLE_3 = '';
+    const EXAMPLE_4 = '';
+    const EXAMPLE_MIXED = '正文整数Nが与字え列らSがれ与まえられす。まNをす。Sを2回繰り2返倍ししてて得連結させらた文れる字列整を数を出力して求めくだてさください。い。';
+
+    const COLOR_OPTIONS = [
+      ['#ff0000', '赤'],
+      ['#0000ff', '青'],
+      ['#40BA8D', '緑青'],
+      ['#984ea3', '紫'],
+      ['#ff7f00', '橙'],
+      ['#4daf4a', '緑'],
+      ['#a65628', '茶'],
+      ['#f781bf', 'ピンク'],
+      ['#17becf', '水色'],
+      ['#111111', '黒']
+    ];
 
     let currentMode = 'overlap';
+
+    const COLOR_NAME = Object.fromEntries(COLOR_OPTIONS);
+
 
     function escapeHtml(s) {
       return s
@@ -288,7 +467,83 @@
     }
 
     function getSources() {
-      return [$('src1').value, $('src2').value, $('src3').value];
+      return [$('src1').value, $('src2').value, $('src3').value, $('src4').value];
+    }
+
+    function getColors() {
+      return [$('color1').value, $('color2').value, $('color3').value, $('color4').value];
+    }
+
+    function applyThemeColors() {
+      const colors = getColors();
+      document.documentElement.style.setProperty('--c1', colors[0]);
+      document.documentElement.style.setProperty('--c2', colors[1]);
+      document.documentElement.style.setProperty('--c3', colors[2]);
+      document.documentElement.style.setProperty('--c4', colors[3]);
+      ['legend1','legend2','legend3','legend4'].forEach((id, i) => {
+        $(id).style.background = colors[i];
+      });
+      ['legendText1','legendText2','legendText3','legendText4'].forEach((id, i) => {
+        $(id).style.color = colors[i];
+        $(id).textContent = COLOR_NAME[colors[i]] || '色';
+      });
+      updateAllColorPreviews();
+    }
+
+    function populateColorSelect(id, initial) {
+      const sel = $(id);
+      sel.innerHTML = '';
+      for (const [value, label] of COLOR_OPTIONS) {
+        const opt = document.createElement('option');
+        opt.value = value;
+        opt.textContent = label;
+        if (value.toLowerCase() === initial.toLowerCase()) opt.selected = true;
+        sel.appendChild(opt);
+      }
+    }
+
+    function buildColorPicker(idx) {
+      const sel = $(`color${idx}`);
+      const menu = $(`pickerMenu${idx}`);
+      menu.innerHTML = '';
+      COLOR_OPTIONS.forEach(([value, label]) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'colorOption';
+        btn.innerHTML = `<span class="colorPreviewSwatch" style="background:${value}"></span><span style="color:${value};font-weight:700;">${label}</span>`;
+        btn.addEventListener('click', () => {
+          sel.value = value;
+          updateColorPreview(idx);
+          applyThemeColors();
+          refreshHighlight(false);
+          closeAllPickers();
+        });
+        menu.appendChild(btn);
+      });
+
+      $(`pickerBtn${idx}`).addEventListener('click', (e) => {
+        e.stopPropagation();
+        const wrap = $(`picker${idx}`);
+        const willOpen = !wrap.classList.contains('open');
+        closeAllPickers();
+        if (willOpen) wrap.classList.add('open');
+      });
+    }
+
+    function closeAllPickers() {
+      [1,2,3,4].forEach(i => $(`picker${i}`).classList.remove('open'));
+    }
+
+    function updateColorPreview(idx) {
+      const value = $(`color${idx}`).value;
+      const label = COLOR_NAME[value] || '色';
+      $(`pickerSwatch${idx}`).style.background = value;
+      $(`pickerLabel${idx}`).style.color = value;
+      $(`pickerLabel${idx}`).textContent = label;
+    }
+
+    function updateAllColorPreviews() {
+      [1, 2, 3, 4].forEach(updateColorPreview);
     }
 
     function findGreedySubsequencePositions(source, mixed) {
@@ -320,10 +575,16 @@
       if (mask === 1) return 'seg1';
       if (mask === 2) return 'seg2';
       if (mask === 4) return 'seg3';
-      if (mask === 3) return 'seg1 multi';
-      if (mask === 5) return 'seg1 multi';
-      if (mask === 6) return 'seg2 multi';
-      if (mask === 7) return 'seg1 multi';
+      if (mask === 8) return 'seg4';
+      if (mask !== 0) {
+        const parts = [];
+        if (mask & 1) parts.push('seg1');
+        if (mask & 2) parts.push('seg2');
+        if (mask & 4) parts.push('seg3');
+        if (mask & 8) parts.push('seg4');
+        parts.push('multi');
+        return parts.join(' ');
+      }
       return '';
     }
 
@@ -381,79 +642,91 @@
       selection.addRange(range);
     }
 
-    function encodeState(a, b, c) {
-      return `${a}|${b}|${c}`;
+    function encodeState(arr) {
+      return arr.join('|');
     }
 
     function decodeState(key) {
       return key.split('|').map(Number);
     }
 
-    function pruneDominated(stateKeys) {
-      const arr = Array.from(stateKeys, decodeState);
-      const keep = [];
-      for (let i = 0; i < arr.length; i++) {
-        let dominated = false;
-        for (let j = 0; j < arr.length; j++) {
-          if (i === j) continue;
-          if (arr[j][0] >= arr[i][0] && arr[j][1] >= arr[i][1] && arr[j][2] >= arr[i][2] &&
-              (arr[j][0] > arr[i][0] || arr[j][1] > arr[i][1] || arr[j][2] > arr[i][2])) {
-            dominated = true;
-            break;
-          }
-        }
-        if (!dominated) keep.push(encodeState(arr[i][0], arr[i][1], arr[i][2]));
-      }
-      return keep;
-    }
-
     function solveUniqueAssignment(mixed, sources) {
-      const lens = sources.map((s) => s.length);
-      const target = encodeState(lens[0], lens[1], lens[2]);
-      let frontier = new Set([encodeState(0, 0, 0)]);
-      const parents = [];
+      const m = sources.length;
+      const lens = sources.map(s => s.length);
+      const target = encodeState(lens);
+
+      let frontier = new Set([encodeState(Array(m).fill(0))]);
 
       for (let idx = 0; idx < mixed.length; idx++) {
         const ch = mixed[idx];
-        const candidateMap = new Map();
-
-        function offer(nextKey, prevKey, action) {
-          if (!candidateMap.has(nextKey)) {
-            candidateMap.set(nextKey, { prev: prevKey, action });
+        const next = new Set();
+        for (const key of frontier) {
+          const state = decodeState(key);
+          next.add(key);
+          for (let t = 0; t < m; t++) {
+            if (state[t] < lens[t] && sources[t][state[t]] === ch) {
+              const ns = state.slice();
+              ns[t] += 1;
+              next.add(encodeState(ns));
+            }
           }
         }
-
-        for (const key of frontier) {
-          const [a, b, c] = decodeState(key);
-          offer(key, key, 0);
-          if (a < lens[0] && sources[0][a] === ch) offer(encodeState(a + 1, b, c), key, 1);
-          if (b < lens[1] && sources[1][b] === ch) offer(encodeState(a, b + 1, c), key, 2);
-          if (c < lens[2] && sources[2][c] === ch) offer(encodeState(a, b, c + 1), key, 3);
-        }
-
-        const prunedKeys = pruneDominated(candidateMap.keys());
-        const nextParents = new Map();
-        for (const key of prunedKeys) {
-          nextParents.set(key, candidateMap.get(key));
-        }
-        parents.push(nextParents);
-        frontier = new Set(prunedKeys);
+        frontier = next;
       }
 
       if (!frontier.has(target)) {
         return { ok: false, assignment: null };
       }
 
-      const assignment = Array(mixed.length).fill(0);
-      let cur = target;
+      const suffix = Array(mixed.length + 1);
+      suffix[mixed.length] = new Set([target]);
+
       for (let idx = mixed.length - 1; idx >= 0; idx--) {
-        const info = parents[idx].get(cur);
-        if (!info) {
-          return { ok: false, assignment: null };
+        const ch = mixed[idx];
+        const prevSet = new Set();
+        for (const key of suffix[idx + 1]) {
+          prevSet.add(key);
+          const state = decodeState(key);
+          for (let t = 0; t < m; t++) {
+            if (state[t] > 0 && sources[t][state[t] - 1] === ch) {
+              const ps = state.slice();
+              ps[t] -= 1;
+              prevSet.add(encodeState(ps));
+            }
+          }
         }
-        assignment[idx] = info.action;
-        cur = info.prev;
+        suffix[idx] = prevSet;
       }
+
+      let assignment = Array(mixed.length).fill(0);
+      let state = Array(m).fill(0);
+
+      for (let idx = 0; idx < mixed.length; idx++) {
+        const ch = mixed[idx];
+        let chosen = 0;
+        for (let t = 0; t < m; t++) {
+          if (state[t] < lens[t] && sources[t][state[t]] === ch) {
+            const ns = state.slice();
+            ns[t] += 1;
+            if (suffix[idx + 1].has(encodeState(ns))) {
+              chosen = t + 1;
+              state = ns;
+              break;
+            }
+          }
+        }
+        if (chosen === 0) {
+          if (!suffix[idx + 1].has(encodeState(state))) {
+            return { ok: false, assignment: null };
+          }
+        }
+        assignment[idx] = chosen;
+      }
+
+      if (encodeState(state) !== target) {
+        return { ok: false, assignment: null };
+      }
+
       return { ok: true, assignment };
     }
 
@@ -468,15 +741,21 @@
     }
 
     function renderAssignmentMode(mixed, sources) {
+      const nonEmpty = sources.filter(s => s.length > 0).length;
+      if (nonEmpty === 0) {
+        return { classes: Array(mixed.length).fill(''), statusText: '', statusKind: '' };
+      }
       const result = solveUniqueAssignment(mixed, sources);
       if (!result.ok) {
         return {
           classes: Array(mixed.length).fill(''),
-          statusText: '自動割当表示: 各文字を高々1つの問題へ割り当てる形では、3つすべてを最後まで実現できません。',
+          statusText: '自動割当表示: 各文字を高々1つの問題へ割り当てる形では、入力された全問題文を最後まで実現できません。',
           statusKind: 'ng'
         };
       }
-      const classes = result.assignment.map((x) => x === 1 ? 'seg1' : x === 2 ? 'seg2' : x === 3 ? 'seg3' : '');
+      const classes = result.assignment.map((x) =>
+        x === 1 ? 'seg1' : x === 2 ? 'seg2' : x === 3 ? 'seg3' : x === 4 ? 'seg4' : ''
+      );
       return {
         classes,
         statusText: '自動割当表示: 割当可能であることを確認し、実際に1つの割当を構成して表示しています。',
@@ -497,12 +776,11 @@
       const sources = getSources();
       const caret = preserveCaret ? getCaretOffset(editor) : null;
 
-      let result;
-      if (currentMode === 'assign') {
-        result = renderAssignmentMode(mixed, sources);
-      } else {
-        result = renderOverlapMode(mixed, sources);
-      }
+      applyThemeColors();
+
+      const result = currentMode === 'assign'
+        ? renderAssignmentMode(mixed, sources)
+        : renderOverlapMode(mixed, sources);
 
       editor.innerHTML = renderMixed(mixed, result.classes);
 
@@ -532,13 +810,25 @@
       $('src1').value = EXAMPLE_1;
       $('src2').value = EXAMPLE_2;
       $('src3').value = EXAMPLE_3;
+      $('src4').value = EXAMPLE_4;
       setMixedText(EXAMPLE_MIXED);
       refreshHighlight(false);
     }
 
-    ['src1', 'src2', 'src3'].forEach((id) => {
+    populateColorSelect('color1', '#ff0000');
+    populateColorSelect('color2', '#0000ff');
+    populateColorSelect('color3', '#40BA8D');
+    populateColorSelect('color4', '#984ea3');
+    buildColorPicker(1);
+    buildColorPicker(2);
+    buildColorPicker(3);
+    buildColorPicker(4);
+
+    ['src1', 'src2', 'src3', 'src4'].forEach((id) => {
       $(id).addEventListener('input', () => refreshHighlight(false));
     });
+    document.addEventListener('click', () => closeAllPickers());
+
     $('mixedEditor').addEventListener('input', () => refreshHighlight(true));
     $('plainBtn').addEventListener('click', clearHighlight);
     $('exampleBtn').addEventListener('click', loadExample);
