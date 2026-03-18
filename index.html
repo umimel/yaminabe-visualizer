@@ -671,168 +671,224 @@
     }
 
     function solveUniqueAssignment(mixed, sources) {
-      const src = sources.map(s => Array.from(s));
       const mix = Array.from(mixed);
+      const src = sources.map(s => Array.from(s));
       const m = src.length;
       const lens = src.map(s => s.length);
-      const L0 = lens[0], L1 = lens[1], L2 = lens[2], L3 = lens[3];
-      const D0 = L1 + 1;
-      const D1 = L2 + 1;
-      const D2 = L3 + 1;
-      const totalStates = (L0 + 1) * (L1 + 1) * (L2 + 1) * (L3 + 1);
+      const totalNeed = lens.reduce((a, b) => a + b, 0);
 
-      if (!Number.isFinite(totalStates) || totalStates > 20000000) {
+      function buildNeedMaps() {
+        return src.map(arr => {
+          const mp = new Map();
+          for (const ch of arr) mp.set(ch, (mp.get(ch) || 0) + 1);
+          return mp;
+        });
+      }
+
+      function cloneNeedMaps(needMaps) {
+        return needMaps.map(mp => new Map(mp));
+      }
+
+      function canStillFinish(pos, remMixCount, needMaps) {
+        for (let t = 0; t < m; t++) {
+          if (pos[t] > lens[t]) return false;
+          const need = needMaps[t];
+          for (const [ch, cnt] of need.entries()) {
+            if (cnt > (remMixCount.get(ch) || 0)) return false;
+          }
+        }
+        return true;
+      }
+
+      function sumMap(mp) {
+        let s = 0;
+        for (const [, v] of mp) s += v;
+        return s;
+      }
+
+      function scoreChoice(choice, pos, remMixCount, needMaps, orderBias, noise) {
+        let score = 0;
+        const npos = pos.slice();
+        const nneed = cloneNeedMaps(needMaps);
+        const ch = mix[orderBias.index];
+
+        if (choice !== 0) {
+          const t = choice - 1;
+          npos[t]++;
+          const prev = nneed[t].get(ch) || 0;
+          if (prev <= 1) nneed[t].delete(ch);
+          else nneed[t].set(ch, prev - 1);
+
+          score += 1200;
+          score -= (lens[t] - npos[t]) * 0.08;
+
+          let demand = 0;
+          for (let u = 0; u < m; u++) {
+            if (pos[u] < lens[u] && src[u][pos[u]] === ch) demand++;
+          }
+          score += (6 - demand) * 16;
+
+          const remCount = remMixCount.get(ch) || 0;
+          const needCount = nneed[t].get(ch) || 0;
+          score += (remCount - needCount) * 0.35;
+
+          score -= sumMap(nneed[t]) * 0.03;
+          score -= t * 0.005;
+        } else {
+          let demand = 0;
+          for (let u = 0; u < m; u++) {
+            if (pos[u] < lens[u] && src[u][pos[u]] === ch) demand++;
+          }
+          score -= demand * 22;
+        }
+
+        const completed = npos.reduce((a, b) => a + b, 0);
+        const mn = Math.min(...npos);
+        const mx = Math.max(...npos);
+        score += completed * 0.02;
+        score -= (mx - mn) * 0.05;
+        score += noise;
+        return score;
+      }
+
+      function runBeamTrial(seed) {
+        const beamWidth = 24;
+        const keepPerExpand = 6;
+
+        let rem0 = new Map();
+        for (const ch of mix) rem0.set(ch, (rem0.get(ch) || 0) + 1);
+
+        let beam = [{
+          pos: Array(m).fill(0),
+          needMaps: buildNeedMaps(),
+          remMixCount: rem0,
+          assignment: Array(mix.length).fill(0),
+          progress: 0,
+          score: 0
+        }];
+
+        function rngStep(x) {
+          return (x * 1664525 + 1013904223) >>> 0;
+        }
+        let rnd = seed >>> 0;
+
+        for (let idx = 0; idx < mix.length; idx++) {
+          const ch = mix[idx];
+          const nextBeam = [];
+
+          for (const state of beam) {
+            const remMixCount2 = new Map(state.remMixCount);
+            remMixCount2.set(ch, (remMixCount2.get(ch) || 0) - 1);
+
+            const cand = [0];
+            for (let t = 0; t < m; t++) {
+              if (state.pos[t] < lens[t] && src[t][state.pos[t]] === ch) cand.push(t + 1);
+            }
+
+            const scored = [];
+            for (const choice of cand) {
+              const npos = state.pos.slice();
+              const nneed = cloneNeedMaps(state.needMaps);
+              if (choice !== 0) {
+                const t = choice - 1;
+                npos[t]++;
+                const prev = nneed[t].get(ch) || 0;
+                if (prev <= 1) nneed[t].delete(ch);
+                else nneed[t].set(ch, prev - 1);
+              }
+
+              if (!canStillFinish(npos, remMixCount2, nneed)) continue;
+
+              rnd = rngStep(rnd);
+              const noise = (rnd / 4294967296.0 - 0.5) * 0.6;
+              const sc = state.score + scoreChoice(
+                choice,
+                state.pos,
+                remMixCount2,
+                state.needMaps,
+                { index: idx },
+                noise
+              );
+              scored.push({ choice, score: sc, npos, nneed });
+            }
+
+            scored.sort((a, b) => b.score - a.score);
+
+            for (const item of scored.slice(0, keepPerExpand)) {
+              const assign = state.assignment.slice();
+              assign[idx] = item.choice;
+              nextBeam.push({
+                pos: item.npos,
+                needMaps: item.nneed,
+                remMixCount: remMixCount2,
+                assignment: assign,
+                progress: item.npos.reduce((a, b) => a + b, 0),
+                score: item.score
+              });
+            }
+          }
+
+          if (nextBeam.length === 0) break;
+
+          nextBeam.sort((a, b) => {
+            if (b.progress !== a.progress) return b.progress - a.progress;
+            return b.score - a.score;
+          });
+
+          const dedup = new Map();
+          for (const st of nextBeam) {
+            const key = st.pos.join('|');
+            const prev = dedup.get(key);
+            if (!prev || st.score > prev.score) dedup.set(key, st);
+          }
+          beam = Array.from(dedup.values())
+            .sort((a, b) => {
+              if (b.progress !== a.progress) return b.progress - a.progress;
+              return b.score - a.score;
+            })
+            .slice(0, beamWidth);
+        }
+
+        beam.sort((a, b) => {
+          const aok = a.pos.every((v, i) => v === lens[i]) ? 1 : 0;
+          const bok = b.pos.every((v, i) => v === lens[i]) ? 1 : 0;
+          if (bok !== aok) return bok - aok;
+          if (b.progress !== a.progress) return b.progress - a.progress;
+          return b.score - a.score;
+        });
+
+        const best = beam[0];
+        if (!best) return { ok: false, assignment: null, progress: 0 };
         return {
-          ok: false,
-          assignment: null,
-          message: '状態数が大きすぎるため、この入力では高速DPを安全に実行できません。問題文を短くするか、静的モードでお試しください。'
+          ok: best.pos.every((v, i) => v === lens[i]),
+          assignment: best.assignment,
+          progress: best.progress,
+          pos: best.pos,
+          score: best.score
         };
       }
 
-      function flat(a, b, c, d) {
-        return (((a * D0) + b) * D1 + c) * D2 + d;
+      const trials = [];
+      const trialCount = 20;
+      for (let t = 0; t < trialCount; t++) {
+        trials.push(runBeamTrial(123456789 + t * 98765431));
       }
 
-      const posMap = new Map();
-      for (let i = 0; i < mix.length; i++) {
-        const ch = mix[i];
-        if (!posMap.has(ch)) posMap.set(ch, []);
-        posMap.get(ch).push(i);
+      trials.sort((a, b) => {
+        if (Number(b.ok) !== Number(a.ok)) return Number(b.ok) - Number(a.ok);
+        if ((b.progress || 0) !== (a.progress || 0)) return (b.progress || 0) - (a.progress || 0);
+        return (b.score || 0) - (a.score || 0);
+      });
+
+      const best = trials[0];
+      if (best && best.ok) {
+        return { ok: true, assignment: best.assignment };
       }
-
-      function nextAfter(ch, pos) {
-        const arr = posMap.get(ch);
-        if (!arr) return -1;
-        let lo = 0, hi = arr.length;
-        while (lo < hi) {
-          const mid = (lo + hi) >> 1;
-          if (arr[mid] < pos) lo = mid + 1;
-          else hi = mid;
-        }
-        return lo < arr.length ? arr[lo] : -1;
-      }
-
-      const INF = mix.length + 1;
-      const best = new Uint32Array(totalStates);
-      best.fill(INF);
-      best[0] = 0;
-
-      for (let a = 0; a <= L0; a++) {
-        for (let b = 0; b <= L1; b++) {
-          for (let c = 0; c <= L2; c++) {
-            for (let d = 0; d <= L3; d++) {
-              const curIdx = flat(a, b, c, d);
-              const pos = best[curIdx];
-              if (pos === INF) continue;
-
-              if (a < L0) {
-                const p = nextAfter(src[0][a], pos);
-                if (p !== -1) {
-                  const ni = flat(a + 1, b, c, d);
-                  const np = p + 1;
-                  if (np < best[ni]) best[ni] = np;
-                }
-              }
-              if (b < L1) {
-                const p = nextAfter(src[1][b], pos);
-                if (p !== -1) {
-                  const ni = flat(a, b + 1, c, d);
-                  const np = p + 1;
-                  if (np < best[ni]) best[ni] = np;
-                }
-              }
-              if (c < L2) {
-                const p = nextAfter(src[2][c], pos);
-                if (p !== -1) {
-                  const ni = flat(a, b, c + 1, d);
-                  const np = p + 1;
-                  if (np < best[ni]) best[ni] = np;
-                }
-              }
-              if (d < L3) {
-                const p = nextAfter(src[3][d], pos);
-                if (p !== -1) {
-                  const ni = flat(a, b, c, d + 1);
-                  const np = p + 1;
-                  if (np < best[ni]) best[ni] = np;
-                }
-              }
-            }
-          }
-        }
-      }
-
-      const targetIdx = flat(L0, L1, L2, L3);
-      if (best[targetIdx] === INF) {
-        return { ok: false, assignment: null };
-      }
-
-      const assignment = Array(mix.length).fill(0);
-      let a = L0, b = L1, c = L2, d = L3;
-      let curPos = best[targetIdx];
-
-      while (a > 0 || b > 0 || c > 0 || d > 0) {
-        let found = false;
-
-        if (a > 0) {
-          const prevIdx = flat(a - 1, b, c, d);
-          const prevPos = best[prevIdx];
-          if (prevPos !== INF) {
-            const p = nextAfter(src[0][a - 1], prevPos);
-            if (p !== -1 && p + 1 === curPos) {
-              assignment[p] = 1;
-              a--;
-              curPos = prevPos;
-              found = true;
-            }
-          }
-        }
-        if (!found && b > 0) {
-          const prevIdx = flat(a, b - 1, c, d);
-          const prevPos = best[prevIdx];
-          if (prevPos !== INF) {
-            const p = nextAfter(src[1][b - 1], prevPos);
-            if (p !== -1 && p + 1 === curPos) {
-              assignment[p] = 2;
-              b--;
-              curPos = prevPos;
-              found = true;
-            }
-          }
-        }
-        if (!found && c > 0) {
-          const prevIdx = flat(a, b, c - 1, d);
-          const prevPos = best[prevIdx];
-          if (prevPos !== INF) {
-            const p = nextAfter(src[2][c - 1], prevPos);
-            if (p !== -1 && p + 1 === curPos) {
-              assignment[p] = 3;
-              c--;
-              curPos = prevPos;
-              found = true;
-            }
-          }
-        }
-        if (!found && d > 0) {
-          const prevIdx = flat(a, b, c, d - 1);
-          const prevPos = best[prevIdx];
-          if (prevPos !== INF) {
-            const p = nextAfter(src[3][d - 1], prevPos);
-            if (p !== -1 && p + 1 === curPos) {
-              assignment[p] = 4;
-              d--;
-              curPos = prevPos;
-              found = true;
-            }
-          }
-        }
-
-        if (!found) {
-          return { ok: false, assignment: null, message: '復元に失敗しました。' };
-        }
-      }
-
-      return { ok: true, assignment };
+      return {
+        ok: false,
+        assignment: null,
+        message: `ヒューリスティック自動割当: 完全な割当は見つかりませんでした。現在の最良進捗は ${best ? best.progress : 0}/${totalNeed} 文字分です。`
+      };
     }
 
     function renderOverlapMode(mixed, sources) {
@@ -857,7 +913,7 @@
       }
       return {
         classes: result.assignment.map(x => x === 1 ? 'seg1' : x === 2 ? 'seg2' : x === 3 ? 'seg3' : x === 4 ? 'seg4' : ''),
-        statusText: '自動割当表示: 割当可能であることを確認し、実際に1つの割当を構成して表示しています。',
+        statusText: '自動割当表示: ビームサーチ風ヒューリスティックで1つの割当を構成して表示しています。',
         statusKind: 'ok'
       };
     }
