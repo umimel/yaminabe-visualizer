@@ -188,201 +188,102 @@ function decodeState(key) {
 }
 
 function solveUniqueAssignment(mixed, sources) {
-    const mix = mixed;
     const src = sources;
-    const lens = [src[0].length, src[1].length, src[2].length, src[3].length];
+    const lens = src.map(s => s.length);
+    const sumLens = lens.reduce((a, b) => a + b, 0);
 
-    function makeNeedCounts() {
-        const arr = new Array(4);
+    if (sumLens > mixed.length) {
+        return { ok: false, assignment: null, message: `合計文字数が混合問題文より長いです` };
+    }
+
+    const spare = new Map();
+    for (let i = 0; i < mixed.length; i++) {
+        const ch = mixed[i];
+        spare.set(ch, (spare.get(ch) || 0) + 1);
+    }
+
+    for (let t = 0; t < 4; t++) {
+        for (let i = 0; i < lens[t]; i++) {
+            const ch = src[t][i];
+            const current = spare.get(ch) || 0;
+            if (current === 0) {
+                return { ok: false, assignment: null, message: `文字 '${ch}' が不足しています。` };
+            }
+            spare.set(ch, current - 1);
+        }
+    }
+
+    const assignment = new Uint8Array(mixed.length);
+    const visited = new Set();
+    let bestProgress = 0;
+
+    let steps = 0;
+    const MAX_STEPS = 3000000;
+    
+    const useFastKey = mixed.length <= 4095 && lens.every(l => l <= 1023);
+
+    function dfs(mix_i, p0, p1, p2, p3) {
+        if (steps++ > MAX_STEPS) return false;
+        
+        const progress = p0 + p1 + p2 + p3;
+        if (progress > bestProgress) bestProgress = progress;
+        
+        if (progress === sumLens) {
+            return true;
+        }
+        if (mix_i === mixed.length) {
+            return false;
+        }
+
+        let key;
+        if (useFastKey) {
+            key = p0 + p1 * 1024 + p2 * 1048576 + p3 * 1073741824 + mix_i * 1099511627776;
+        } else {
+            key = `${mix_i},${p0},${p1},${p2},${p3}`;
+        }
+        if (visited.has(key)) return false;
+
+        const ch = mixed[mix_i];
+
         for (let t = 0; t < 4; t++) {
-            const mp = new Map();
-            const s = src[t];
-            for (let i = 0; i < s.length; i++) {
-                const ch = s[i];
-                mp.set(ch, (mp.get(ch) || 0) + 1);
-            }
-            arr[t] = mp;
-        }
-        return arr;
-    }
+            let p;
+            if (t === 0) p = p0;
+            else if (t === 1) p = p1;
+            else if (t === 2) p = p2;
+            else p = p3;
 
-    function leftPackAssignment(assignment) {
-        const packed = new Uint8Array(mix.length);
-        const nextPos = new Uint16Array(4);
-        for (let i = 0; i < mix.length; i++) {
-            const owner = assignment[i];
-            if (!owner) continue;
-            const t = owner - 1;
-            const p = nextPos[t];
-            if (p < lens[t] && src[t][p] === mix[i]) {
-                packed[i] = owner;
-                nextPos[t] = p + 1;
-            }
-        }
-        if (
-            nextPos[0] === lens[0] &&
-            nextPos[1] === lens[1] &&
-            nextPos[2] === lens[2] &&
-            nextPos[3] === lens[3]
-        ) return packed;
-        return assignment;
-    }
-
-    function refineAssignmentLeft(assignment) {
-        let cur = assignment;
-        for (let rep = 0; rep < 3; rep++) {
-            const nxt = leftPackAssignment(cur);
-            let same = true;
-            for (let i = 0; i < cur.length; i++) {
-                if (cur[i] !== nxt[i]) {
-                    same = false;
-                    break;
-                }
-            }
-            cur = nxt;
-            if (same) break;
-        }
-        return cur;
-    }
-
-    function runOneTrial(orderMode) {
-        const assignment = new Uint8Array(mix.length);
-        const pos = new Uint16Array(4);
-        const remainingNeedTotal = new Uint16Array(lens);
-        const remMixCount = new Map();
-        for (let i = 0; i < mix.length; i++) {
-            const ch = mix[i];
-            remMixCount.set(ch, (remMixCount.get(ch) || 0) + 1);
-        }
-        const needCounts = makeNeedCounts();
-
-        for (let i = 0; i < mix.length; i++) {
-            const ch = mix[i];
-            const remChAfter = (remMixCount.get(ch) || 0) - 1;
-            remMixCount.set(ch, remChAfter);
-
-            const can0 = pos[0] < lens[0] && src[0][pos[0]] === ch;
-            const can1 = pos[1] < lens[1] && src[1][pos[1]] === ch;
-            const can2 = pos[2] < lens[2] && src[2][pos[2]] === ch;
-            const can3 = pos[3] < lens[3] && src[3][pos[3]] === ch;
-            const demand = (can0 ? 1 : 0) + (can1 ? 1 : 0) + (can2 ? 1 : 0) + (can3 ? 1 : 0);
-
-            let bestChoice = 0;
-            let bestScore = -1e100;
-
-            function evalChoice(choice) {
-                let feasible = true;
-                let needCh0 = (needCounts[0].get(ch) || 0) - (choice === 1 ? 1 : 0);
-                let needCh1 = (needCounts[1].get(ch) || 0) - (choice === 2 ? 1 : 0);
-                let needCh2 = (needCounts[2].get(ch) || 0) - (choice === 3 ? 1 : 0);
-                let needCh3 = (needCounts[3].get(ch) || 0) - (choice === 4 ? 1 : 0);
-                if (needCh0 > remChAfter || needCh1 > remChAfter || needCh2 > remChAfter || needCh3 > remChAfter) feasible = false;
-                if (!feasible) return;
-
-                let score = 0;
-                let p0 = pos[0], p1 = pos[1], p2 = pos[2], p3 = pos[3];
-
-                if (choice !== 0) {
-                    const t = choice - 1;
-                    if (t === 0) p0++;
-                    else if (t === 1) p1++;
-                    else if (t === 2) p2++;
-                    else p3++;
-
-                    const remainingNeed = remainingNeedTotal[t] - 1;
-                    score += 1000;
-                    score -= remainingNeed * 0.05;
-                    score += (5 - demand) * 10;
-
-                    let needChAfter = choice === 1 ? needCh0 : choice === 2 ? needCh1 : choice === 3 ? needCh2 : needCh3;
-                    score += (remChAfter - needChAfter) * 0.2;
-                    score -= remainingNeed * 0.02;
-                    score -= t * 0.001;
-                } else {
-                    score -= demand * 20;
-                }
-
-                const completed = p0 + p1 + p2 + p3;
-                let mn = p0, mx = p0;
-                if (p1 < mn) mn = p1; if (p1 > mx) mx = p1;
-                if (p2 < mn) mn = p2; if (p2 > mx) mx = p2;
-                if (p3 < mn) mn = p3; if (p3 > mx) mx = p3;
-                score += completed * 0.01;
-                score -= (mx - mn) * 0.03;
-
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestChoice = choice;
-                }
-            }
-
-            // preserve previous priority variants without array allocations
-            if (orderMode === 0) {
-                evalChoice(0);
-                if (can0) evalChoice(1);
-                if (can1) evalChoice(2);
-                if (can2) evalChoice(3);
-                if (can3) evalChoice(4);
-            } else if (orderMode === 1) {
-                if (can3) evalChoice(4);
-                if (can2) evalChoice(3);
-                if (can1) evalChoice(2);
-                if (can0) evalChoice(1);
-                evalChoice(0);
-            } else if (orderMode === 2) {
-                evalChoice(0);
-                if (can1) evalChoice(2);
-                if (can3) evalChoice(4);
-                if (can0) evalChoice(1);
-                if (can2) evalChoice(3);
-            } else {
-                evalChoice(0);
-                if (can2) evalChoice(3);
-                if (can0) evalChoice(1);
-                if (can3) evalChoice(4);
-                if (can1) evalChoice(2);
-            }
-
-            if (bestChoice !== 0) {
-                const t = bestChoice - 1;
-                assignment[i] = bestChoice;
-                pos[t] += 1;
-                remainingNeedTotal[t] -= 1;
-                const prev = needCounts[t].get(ch) || 0;
-                if (prev <= 1) needCounts[t].delete(ch);
-                else needCounts[t].set(ch, prev - 1);
+            if (p < lens[t] && src[t][p] === ch) {
+                assignment[mix_i] = t + 1;
+                
+                let ok;
+                if (t === 0) ok = dfs(mix_i + 1, p0 + 1, p1, p2, p3);
+                else if (t === 1) ok = dfs(mix_i + 1, p0, p1 + 1, p2, p3);
+                else if (t === 2) ok = dfs(mix_i + 1, p0, p1, p2 + 1, p3);
+                else ok = dfs(mix_i + 1, p0, p1, p2, p3 + 1);
+                
+                if (ok) return true;
+                
+                assignment[mix_i] = 0;
             }
         }
 
-        const ok =
-            pos[0] === lens[0] &&
-            pos[1] === lens[1] &&
-            pos[2] === lens[2] &&
-            pos[3] === lens[3];
-        const progress = pos[0] + pos[1] + pos[2] + pos[3];
-        return { ok, assignment, progress };
-    }
-
-    let best = null;
-    for (let mode = 0; mode < 4; mode++) {
-        const res = runOneTrial(mode);
-        if (
-            !best ||
-            (Number(res.ok) > Number(best.ok)) ||
-            (res.ok === best.ok && res.progress > best.progress)
-        ) {
-            best = res;
+        if (spare.get(ch) > 0) {
+            spare.set(ch, spare.get(ch) - 1);
+            if (dfs(mix_i + 1, p0, p1, p2, p3)) return true;
+            spare.set(ch, spare.get(ch) + 1);
         }
+
+        visited.add(key);
+        return false;
     }
 
-    if (best.ok) {
-        return { ok: true, assignment: refineAssignmentLeft(best.assignment) };
+    const success = dfs(0, 0, 0, 0, 0);
+
+    if (success) {
+        return { ok: true, assignment: assignment };
+    } else {
+        return { ok: false, assignment: null, message: `矛盾が発生しました (最良進捗: ${bestProgress}/${sumLens})` };
     }
-    return {
-        ok: false,
-        assignment: null,
-        message: `ヒューリスティック自動割当: 完全な割当は見つかりませんでした。現在の最良進捗は ${best.progress} 文字分です。`
-    };
 }
 
 
