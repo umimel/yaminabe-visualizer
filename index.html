@@ -324,6 +324,26 @@
     }
     .statusText.ok { color: #067647; }
     .statusText.ng { color: #b42318; }
+    .jsonPanel {
+      margin-top: 12px;
+      border-top: 1px dashed var(--line);
+      padding-top: 12px;
+    }
+    .jsonPanelHeader {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    .jsonArea {
+      width: 100%;
+      min-height: 220px;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      line-height: 1.5;
+    }
     @media (max-width: 1100px) {
       .wrap { grid-template-rows: auto auto auto; }
       .bottom { grid-template-columns: 1fr; }
@@ -351,6 +371,8 @@
             <button id="runStaticBtn" class="modeBtn">静的モード</button>
           </div>
           <button id="runAssignBtn" style="display:none;">自動割当を実行</button>
+          <button id="exportBtn">JSON書き出し</button>
+          <button id="importBtn">JSON読み込み</button>
           <button id="plainBtn">色を消す</button>
           <button id="exampleBtn">例を表示</button>
         </div>
@@ -367,6 +389,17 @@
       </div>
       <div id="mixedEditor" class="mixedEditor" contenteditable="true" spellcheck="false" data-placeholder="ここに混合問題文を入力してください。"></div>
       <div id="statusText" class="statusText"></div>
+      <div id="jsonPanel" class="jsonPanel" style="display:none;">
+        <div class="jsonPanelHeader">
+          <div class="title">状態JSON</div>
+          <div class="controls">
+            <button id="copyJsonBtn">コピー</button>
+            <button id="applyJsonBtn">読み込みを反映</button>
+            <button id="closeJsonBtn">閉じる</button>
+          </div>
+        </div>
+        <textarea id="jsonArea" class="jsonArea" spellcheck="false"></textarea>
+      </div>
     </div>
 
     <div class="bottom">
@@ -671,223 +704,200 @@
     }
 
     function solveUniqueAssignment(mixed, sources) {
-      const mix = Array.from(mixed);
-      const src = sources.map(s => Array.from(s));
-      const m = src.length;
-      const lens = src.map(s => s.length);
-      const totalNeed = lens.reduce((a, b) => a + b, 0);
+      const mix = mixed;
+      const src = sources;
+      const lens = [src[0].length, src[1].length, src[2].length, src[3].length];
 
-      function buildNeedMaps() {
-        return src.map(arr => {
+      function makeNeedCounts() {
+        const arr = new Array(4);
+        for (let t = 0; t < 4; t++) {
           const mp = new Map();
-          for (const ch of arr) mp.set(ch, (mp.get(ch) || 0) + 1);
-          return mp;
-        });
+          const s = src[t];
+          for (let i = 0; i < s.length; i++) {
+            const ch = s[i];
+            mp.set(ch, (mp.get(ch) || 0) + 1);
+          }
+          arr[t] = mp;
+        }
+        return arr;
       }
 
-      function cloneNeedMaps(needMaps) {
-        return needMaps.map(mp => new Map(mp));
-      }
-
-      function canStillFinish(pos, remMixCount, needMaps) {
-        for (let t = 0; t < m; t++) {
-          if (pos[t] > lens[t]) return false;
-          const need = needMaps[t];
-          for (const [ch, cnt] of need.entries()) {
-            if (cnt > (remMixCount.get(ch) || 0)) return false;
+      function leftPackAssignment(assignment) {
+        const packed = new Uint8Array(mix.length);
+        const nextPos = new Uint16Array(4);
+        for (let i = 0; i < mix.length; i++) {
+          const owner = assignment[i];
+          if (!owner) continue;
+          const t = owner - 1;
+          const p = nextPos[t];
+          if (p < lens[t] && src[t][p] === mix[i]) {
+            packed[i] = owner;
+            nextPos[t] = p + 1;
           }
         }
-        return true;
+        if (
+          nextPos[0] === lens[0] &&
+          nextPos[1] === lens[1] &&
+          nextPos[2] === lens[2] &&
+          nextPos[3] === lens[3]
+        ) return packed;
+        return assignment;
       }
 
-      function sumMap(mp) {
-        let s = 0;
-        for (const [, v] of mp) s += v;
-        return s;
-      }
-
-      function scoreChoice(choice, pos, remMixCount, needMaps, orderBias, noise) {
-        let score = 0;
-        const npos = pos.slice();
-        const nneed = cloneNeedMaps(needMaps);
-        const ch = mix[orderBias.index];
-
-        if (choice !== 0) {
-          const t = choice - 1;
-          npos[t]++;
-          const prev = nneed[t].get(ch) || 0;
-          if (prev <= 1) nneed[t].delete(ch);
-          else nneed[t].set(ch, prev - 1);
-
-          score += 1200;
-          score -= (lens[t] - npos[t]) * 0.08;
-
-          let demand = 0;
-          for (let u = 0; u < m; u++) {
-            if (pos[u] < lens[u] && src[u][pos[u]] === ch) demand++;
+      function refineAssignmentLeft(assignment) {
+        let cur = assignment;
+        for (let rep = 0; rep < 3; rep++) {
+          const nxt = leftPackAssignment(cur);
+          let same = true;
+          for (let i = 0; i < cur.length; i++) {
+            if (cur[i] !== nxt[i]) {
+              same = false;
+              break;
+            }
           }
-          score += (6 - demand) * 16;
-
-          const remCount = remMixCount.get(ch) || 0;
-          const needCount = nneed[t].get(ch) || 0;
-          score += (remCount - needCount) * 0.35;
-
-          score -= sumMap(nneed[t]) * 0.03;
-          score -= t * 0.005;
-        } else {
-          let demand = 0;
-          for (let u = 0; u < m; u++) {
-            if (pos[u] < lens[u] && src[u][pos[u]] === ch) demand++;
-          }
-          score -= demand * 22;
+          cur = nxt;
+          if (same) break;
         }
-
-        const completed = npos.reduce((a, b) => a + b, 0);
-        const mn = Math.min(...npos);
-        const mx = Math.max(...npos);
-        score += completed * 0.02;
-        score -= (mx - mn) * 0.05;
-        score += noise;
-        return score;
+        return cur;
       }
 
-      function runBeamTrial(seed) {
-        const beamWidth = 24;
-        const keepPerExpand = 6;
-
-        let rem0 = new Map();
-        for (const ch of mix) rem0.set(ch, (rem0.get(ch) || 0) + 1);
-
-        let beam = [{
-          pos: Array(m).fill(0),
-          needMaps: buildNeedMaps(),
-          remMixCount: rem0,
-          assignment: Array(mix.length).fill(0),
-          progress: 0,
-          score: 0
-        }];
-
-        function rngStep(x) {
-          return (x * 1664525 + 1013904223) >>> 0;
+      function runOneTrial(orderMode) {
+        const assignment = new Uint8Array(mix.length);
+        const pos = new Uint16Array(4);
+        const remainingNeedTotal = new Uint16Array(lens);
+        const remMixCount = new Map();
+        for (let i = 0; i < mix.length; i++) {
+          const ch = mix[i];
+          remMixCount.set(ch, (remMixCount.get(ch) || 0) + 1);
         }
-        let rnd = seed >>> 0;
+        const needCounts = makeNeedCounts();
 
-        for (let idx = 0; idx < mix.length; idx++) {
-          const ch = mix[idx];
-          const nextBeam = [];
+        for (let i = 0; i < mix.length; i++) {
+          const ch = mix[i];
+          const remChAfter = (remMixCount.get(ch) || 0) - 1;
+          remMixCount.set(ch, remChAfter);
 
-          for (const state of beam) {
-            const remMixCount2 = new Map(state.remMixCount);
-            remMixCount2.set(ch, (remMixCount2.get(ch) || 0) - 1);
+          const can0 = pos[0] < lens[0] && src[0][pos[0]] === ch;
+          const can1 = pos[1] < lens[1] && src[1][pos[1]] === ch;
+          const can2 = pos[2] < lens[2] && src[2][pos[2]] === ch;
+          const can3 = pos[3] < lens[3] && src[3][pos[3]] === ch;
+          const demand = (can0 ? 1 : 0) + (can1 ? 1 : 0) + (can2 ? 1 : 0) + (can3 ? 1 : 0);
 
-            const cand = [0];
-            for (let t = 0; t < m; t++) {
-              if (state.pos[t] < lens[t] && src[t][state.pos[t]] === ch) cand.push(t + 1);
+          let bestChoice = 0;
+          let bestScore = -1e100;
+
+          function evalChoice(choice) {
+            let feasible = true;
+            let needCh0 = (needCounts[0].get(ch) || 0) - (choice === 1 ? 1 : 0);
+            let needCh1 = (needCounts[1].get(ch) || 0) - (choice === 2 ? 1 : 0);
+            let needCh2 = (needCounts[2].get(ch) || 0) - (choice === 3 ? 1 : 0);
+            let needCh3 = (needCounts[3].get(ch) || 0) - (choice === 4 ? 1 : 0);
+            if (needCh0 > remChAfter || needCh1 > remChAfter || needCh2 > remChAfter || needCh3 > remChAfter) feasible = false;
+            if (!feasible) return;
+
+            let score = 0;
+            let p0 = pos[0], p1 = pos[1], p2 = pos[2], p3 = pos[3];
+
+            if (choice !== 0) {
+              const t = choice - 1;
+              if (t === 0) p0++;
+              else if (t === 1) p1++;
+              else if (t === 2) p2++;
+              else p3++;
+
+              const remainingNeed = remainingNeedTotal[t] - 1;
+              score += 1000;
+              score -= remainingNeed * 0.05;
+              score += (5 - demand) * 10;
+
+              let needChAfter = choice === 1 ? needCh0 : choice === 2 ? needCh1 : choice === 3 ? needCh2 : needCh3;
+              score += (remChAfter - needChAfter) * 0.2;
+              score -= remainingNeed * 0.02;
+              score -= t * 0.001;
+            } else {
+              score -= demand * 20;
             }
 
-            const scored = [];
-            for (const choice of cand) {
-              const npos = state.pos.slice();
-              const nneed = cloneNeedMaps(state.needMaps);
-              if (choice !== 0) {
-                const t = choice - 1;
-                npos[t]++;
-                const prev = nneed[t].get(ch) || 0;
-                if (prev <= 1) nneed[t].delete(ch);
-                else nneed[t].set(ch, prev - 1);
-              }
+            const completed = p0 + p1 + p2 + p3;
+            let mn = p0, mx = p0;
+            if (p1 < mn) mn = p1; if (p1 > mx) mx = p1;
+            if (p2 < mn) mn = p2; if (p2 > mx) mx = p2;
+            if (p3 < mn) mn = p3; if (p3 > mx) mx = p3;
+            score += completed * 0.01;
+            score -= (mx - mn) * 0.03;
 
-              if (!canStillFinish(npos, remMixCount2, nneed)) continue;
-
-              rnd = rngStep(rnd);
-              const noise = (rnd / 4294967296.0 - 0.5) * 0.6;
-              const sc = state.score + scoreChoice(
-                choice,
-                state.pos,
-                remMixCount2,
-                state.needMaps,
-                { index: idx },
-                noise
-              );
-              scored.push({ choice, score: sc, npos, nneed });
-            }
-
-            scored.sort((a, b) => b.score - a.score);
-
-            for (const item of scored.slice(0, keepPerExpand)) {
-              const assign = state.assignment.slice();
-              assign[idx] = item.choice;
-              nextBeam.push({
-                pos: item.npos,
-                needMaps: item.nneed,
-                remMixCount: remMixCount2,
-                assignment: assign,
-                progress: item.npos.reduce((a, b) => a + b, 0),
-                score: item.score
-              });
+            if (score > bestScore) {
+              bestScore = score;
+              bestChoice = choice;
             }
           }
 
-          if (nextBeam.length === 0) break;
-
-          nextBeam.sort((a, b) => {
-            if (b.progress !== a.progress) return b.progress - a.progress;
-            return b.score - a.score;
-          });
-
-          const dedup = new Map();
-          for (const st of nextBeam) {
-            const key = st.pos.join('|');
-            const prev = dedup.get(key);
-            if (!prev || st.score > prev.score) dedup.set(key, st);
+          // preserve previous priority variants without array allocations
+          if (orderMode === 0) {
+            evalChoice(0);
+            if (can0) evalChoice(1);
+            if (can1) evalChoice(2);
+            if (can2) evalChoice(3);
+            if (can3) evalChoice(4);
+          } else if (orderMode === 1) {
+            if (can3) evalChoice(4);
+            if (can2) evalChoice(3);
+            if (can1) evalChoice(2);
+            if (can0) evalChoice(1);
+            evalChoice(0);
+          } else if (orderMode === 2) {
+            evalChoice(0);
+            if (can1) evalChoice(2);
+            if (can3) evalChoice(4);
+            if (can0) evalChoice(1);
+            if (can2) evalChoice(3);
+          } else {
+            evalChoice(0);
+            if (can2) evalChoice(3);
+            if (can0) evalChoice(1);
+            if (can3) evalChoice(4);
+            if (can1) evalChoice(2);
           }
-          beam = Array.from(dedup.values())
-            .sort((a, b) => {
-              if (b.progress !== a.progress) return b.progress - a.progress;
-              return b.score - a.score;
-            })
-            .slice(0, beamWidth);
+
+          if (bestChoice !== 0) {
+            const t = bestChoice - 1;
+            assignment[i] = bestChoice;
+            pos[t] += 1;
+            remainingNeedTotal[t] -= 1;
+            const prev = needCounts[t].get(ch) || 0;
+            if (prev <= 1) needCounts[t].delete(ch);
+            else needCounts[t].set(ch, prev - 1);
+          }
         }
 
-        beam.sort((a, b) => {
-          const aok = a.pos.every((v, i) => v === lens[i]) ? 1 : 0;
-          const bok = b.pos.every((v, i) => v === lens[i]) ? 1 : 0;
-          if (bok !== aok) return bok - aok;
-          if (b.progress !== a.progress) return b.progress - a.progress;
-          return b.score - a.score;
-        });
-
-        const best = beam[0];
-        if (!best) return { ok: false, assignment: null, progress: 0 };
-        return {
-          ok: best.pos.every((v, i) => v === lens[i]),
-          assignment: best.assignment,
-          progress: best.progress,
-          pos: best.pos,
-          score: best.score
-        };
+        const ok =
+          pos[0] === lens[0] &&
+          pos[1] === lens[1] &&
+          pos[2] === lens[2] &&
+          pos[3] === lens[3];
+        const progress = pos[0] + pos[1] + pos[2] + pos[3];
+        return { ok, assignment, progress };
       }
 
-      const trials = [];
-      const trialCount = 20;
-      for (let t = 0; t < trialCount; t++) {
-        trials.push(runBeamTrial(123456789 + t * 98765431));
+      let best = null;
+      for (let mode = 0; mode < 4; mode++) {
+        const res = runOneTrial(mode);
+        if (
+          !best ||
+          (Number(res.ok) > Number(best.ok)) ||
+          (res.ok === best.ok && res.progress > best.progress)
+        ) {
+          best = res;
+        }
       }
 
-      trials.sort((a, b) => {
-        if (Number(b.ok) !== Number(a.ok)) return Number(b.ok) - Number(a.ok);
-        if ((b.progress || 0) !== (a.progress || 0)) return (b.progress || 0) - (a.progress || 0);
-        return (b.score || 0) - (a.score || 0);
-      });
-
-      const best = trials[0];
-      if (best && best.ok) {
-        return { ok: true, assignment: best.assignment };
+      if (best.ok) {
+        return { ok: true, assignment: refineAssignmentLeft(best.assignment) };
       }
       return {
         ok: false,
         assignment: null,
-        message: `ヒューリスティック自動割当: 完全な割当は見つかりませんでした。現在の最良進捗は ${best ? best.progress : 0}/${totalNeed} 文字分です。`
+        message: `ヒューリスティック自動割当: 完全な割当は見つかりませんでした。現在の最良進捗は ${best.progress} 文字分です。`
       };
     }
 
@@ -913,7 +923,7 @@
       }
       return {
         classes: result.assignment.map(x => x === 1 ? 'seg1' : x === 2 ? 'seg2' : x === 3 ? 'seg3' : x === 4 ? 'seg4' : ''),
-        statusText: '自動割当表示: ビームサーチ風ヒューリスティックで1つの割当を構成して表示しています。',
+        statusText: '自動割当表示: ヒューリスティックに1つの割当を構成して表示しています。',
         statusKind: 'ok'
       };
     }
@@ -959,12 +969,16 @@
           const sig = cacheSignature();
           if (cachedAssignment && cachedAssignment.signature === sig) {
             result = cachedAssignment.result;
+          } else if (cachedAssignment) {
+            result = {
+              classes: cachedAssignment.result.classes.slice(),
+              statusText: '静的モード: 入力が変更されました。現在は前回の色付けを表示中です。「自動割当を実行」を押すと更新します。',
+              statusKind: ''
+            };
           } else {
             result = {
               classes: Array(mixed.length).fill(''),
-              statusText: cachedAssignment
-                ? '静的モード: 入力が変更されました。「自動割当を実行」を押して更新してください。'
-                : '静的モード: 「自動割当を実行」を押すと自動割当を計算します。',
+              statusText: '静的モード: 「自動割当を実行」を押すと自動割当を計算します。',
               statusKind: ''
             };
           }
@@ -981,6 +995,61 @@
 
       if (preserveCaret && caret !== null) {
         setCaretOffset(editor, Math.min(caret, mixed.length));
+      }
+    }
+
+
+    function exportStateJson() {
+      const state = {
+        version: 1,
+        mixedText: getMixedText(),
+        sources: getSources(),
+        colors: getColors(),
+        currentMode,
+        assignmentRunMode
+      };
+      return JSON.stringify(state, null, 2);
+    }
+
+    function openJsonPanel(withText = '') {
+      $('jsonPanel').style.display = '';
+      $('jsonArea').value = withText;
+    }
+
+    function closeJsonPanel() {
+      $('jsonPanel').style.display = 'none';
+    }
+
+    function importStateJson(raw) {
+      const data = JSON.parse(raw);
+      if (!data || typeof data !== 'object') throw new Error('JSONの形式が不正です。');
+
+      const mixedText = typeof data.mixedText === 'string' ? data.mixedText : '';
+      const sources = Array.isArray(data.sources) ? data.sources : [];
+      const colors = Array.isArray(data.colors) ? data.colors : [];
+
+      setMixedText(mixedText);
+      ['src1','src2','src3','src4'].forEach((id, i) => {
+        $(id).value = typeof sources[i] === 'string' ? sources[i] : '';
+      });
+
+      ['color1','color2','color3','color4'].forEach((id, i) => {
+        if (typeof colors[i] === 'string') {
+          const ok = COLOR_OPTIONS.some(([v]) => v.toLowerCase() === colors[i].toLowerCase());
+          if (ok) $(id).value = colors[i];
+        }
+      });
+
+      updateAllColorPreviews();
+      applyThemeColors();
+
+      if (data.assignmentRunMode === 'static' || data.assignmentRunMode === 'dynamic') {
+        setAssignmentRunMode(data.assignmentRunMode);
+      }
+      if (data.currentMode === 'assign' || data.currentMode === 'overlap') {
+        setMode(data.currentMode);
+      } else {
+        refreshHighlight(false);
       }
     }
 
@@ -1018,7 +1087,7 @@
 
     ['src1', 'src2', 'src3', 'src4'].forEach((id) => {
       $(id).addEventListener('input', () => {
-        invalidateAssignmentCache();
+        if (assignmentRunMode === 'dynamic') invalidateAssignmentCache();
         refreshHighlight(false);
       });
     });
@@ -1026,9 +1095,41 @@
     document.addEventListener('click', () => closeAllPickers());
 
     $('mixedEditor').addEventListener('input', () => {
-      invalidateAssignmentCache();
+      if (assignmentRunMode === 'dynamic') invalidateAssignmentCache();
       refreshHighlight(true);
     });
+    $('exportBtn').addEventListener('click', () => {
+      openJsonPanel(exportStateJson());
+    });
+    $('importBtn').addEventListener('click', () => {
+      openJsonPanel('');
+    });
+    $('copyJsonBtn').addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText($('jsonArea').value);
+        $('statusText').textContent = 'JSONをコピーしました。';
+        $('statusText').classList.remove('ng');
+        $('statusText').classList.add('ok');
+      } catch (e) {
+        $('statusText').textContent = 'コピーに失敗しました。手動でコピーしてください。';
+        $('statusText').classList.remove('ok');
+        $('statusText').classList.add('ng');
+      }
+    });
+    $('applyJsonBtn').addEventListener('click', () => {
+      try {
+        importStateJson($('jsonArea').value);
+        closeJsonPanel();
+        $('statusText').textContent = 'JSONを読み込みました。';
+        $('statusText').classList.remove('ng');
+        $('statusText').classList.add('ok');
+      } catch (e) {
+        $('statusText').textContent = `JSONの読み込みに失敗しました: ${e.message}`;
+        $('statusText').classList.remove('ok');
+        $('statusText').classList.add('ng');
+      }
+    });
+    $('closeJsonBtn').addEventListener('click', closeJsonPanel);
     $('plainBtn').addEventListener('click', clearHighlight);
     $('exampleBtn').addEventListener('click', () => {
       invalidateAssignmentCache();
