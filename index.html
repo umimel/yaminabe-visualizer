@@ -922,7 +922,7 @@
         };
       }
       return {
-        classes: result.assignment.map(x => x === 1 ? 'seg1' : x === 2 ? 'seg2' : x === 3 ? 'seg3' : x === 4 ? 'seg4' : ''),
+        classes: Array.from(result.assignment, x => x === 1 ? 'seg1' : x === 2 ? 'seg2' : x === 3 ? 'seg3' : x === 4 ? 'seg4' : ''),
         statusText: '自動割当表示: ヒューリスティックに1つの割当を構成して表示しています。',
         statusKind: 'ok'
       };
