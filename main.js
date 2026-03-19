@@ -20,8 +20,7 @@ const $ = (id) => document.getElementById(id);
     ];
     const COLOR_NAME = Object.fromEntries(COLOR_OPTIONS);
 
-    let currentMode = 'overlap';
-    let assignmentRunMode = 'dynamic';
+        let assignmentRunMode = 'dynamic';
     let cachedAssignment = null;
 
     function escapeHtml(s) {
@@ -128,47 +127,6 @@ const $ = (id) => document.getElementById(id);
       [1,2,3,4].forEach(updateColorPreview);
     }
 
-    function findGreedySubsequencePositions(source, mixed) {
-      const pos = [];
-      if (!source.length || !mixed.length) return pos;
-      let j = 0;
-      for (let i = 0; i < source.length; i++) {
-        while (j < mixed.length && mixed[j] !== source[i]) j++;
-        if (j === mixed.length) break;
-        pos.push(j);
-        j++;
-      }
-      return pos;
-    }
-
-    function buildOverlapMasks(mixed, sources) {
-      const masks = Array(mixed.length).fill(0);
-      sources.forEach((src, idx) => {
-        const positions = findGreedySubsequencePositions(src, mixed);
-        const bit = 1 << idx;
-        positions.forEach((p) => {
-          masks[p] |= bit;
-        });
-      });
-      return masks;
-    }
-
-    function classNameFromMask(mask) {
-      if (mask === 1) return 'seg1';
-      if (mask === 2) return 'seg2';
-      if (mask === 4) return 'seg3';
-      if (mask === 8) return 'seg4';
-      if (mask !== 0) {
-        const parts = [];
-        if (mask & 1) parts.push('seg1');
-        if (mask & 2) parts.push('seg2');
-        if (mask & 4) parts.push('seg3');
-        if (mask & 8) parts.push('seg4');
-        parts.push('multi');
-        return parts.join(' ');
-      }
-      return '';
-    }
 
     function renderMixed(mixed, classes) {
       if (!mixed.length) return '';
@@ -427,14 +385,6 @@ const $ = (id) => document.getElementById(id);
       };
     }
 
-    function renderOverlapMode(mixed, sources) {
-      const masks = buildOverlapMasks(mixed, sources);
-      return {
-        classes: masks.map(classNameFromMask),
-        statusText: '通常表示: 各問題文を独立に部分列として読んだ位置を重ねて表示しています。',
-        statusKind: 'ok'
-      };
-    }
 
     function renderAssignmentMode(mixed, sources) {
       const nonEmpty = sources.filter(s => s.length > 0).length;
@@ -466,19 +416,12 @@ const $ = (id) => document.getElementById(id);
       return cachedAssignment.result;
     }
 
-    function setMode(mode) {
-      currentMode = mode;
-      $('modeOverlapBtn').classList.toggle('active', mode === 'overlap');
-      $('modeAssignBtn').classList.toggle('active', mode === 'assign');
-      $('runAssignBtn').style.display = (mode === 'assign' && assignmentRunMode === 'static') ? '' : 'none';
-      refreshHighlight(false);
-    }
 
     function setAssignmentRunMode(mode) {
       assignmentRunMode = mode;
       $('runDynamicBtn').classList.toggle('active', mode === 'dynamic');
       $('runStaticBtn').classList.toggle('active', mode === 'static');
-      $('runAssignBtn').style.display = (currentMode === 'assign' && mode === 'static') ? '' : 'none';
+      $('runAssignBtn').style.display = (mode === 'static') ? '' : 'none';
     }
 
     function refreshHighlight(preserveCaret = false) {
@@ -488,29 +431,25 @@ const $ = (id) => document.getElementById(id);
       applyThemeColors();
 
       let result;
-      if (currentMode === 'assign') {
-        if (assignmentRunMode === 'dynamic') {
-          result = recomputeAssignmentRender();
-        } else {
-          const sig = cacheSignature();
-          if (cachedAssignment && cachedAssignment.signature === sig) {
-            result = cachedAssignment.result;
-          } else if (cachedAssignment) {
-            result = {
-              classes: cachedAssignment.result.classes.slice(),
-              statusText: '静的モード: 入力が変更されました。現在は前回の色付けを表示中です。「自動割当を実行」を押すと更新します。',
-              statusKind: ''
-            };
-          } else {
-            result = {
-              classes: Array(mixed.length).fill(''),
-              statusText: '静的モード: 「自動割当を実行」を押すと自動割当を計算します。',
-              statusKind: ''
-            };
-          }
-        }
+      if (assignmentRunMode === 'dynamic') {
+        result = recomputeAssignmentRender();
       } else {
-        result = renderOverlapMode(mixed, getSources());
+        const sig = cacheSignature();
+        if (cachedAssignment && cachedAssignment.signature === sig) {
+          result = cachedAssignment.result;
+        } else if (cachedAssignment) {
+          result = {
+            classes: cachedAssignment.result.classes.slice(),
+            statusText: '静的モード: 入力が変更されました。現在は前回の色付けを表示中です。「自動割当を実行」を押すと更新します。',
+            statusKind: ''
+          };
+        } else {
+          result = {
+            classes: Array(mixed.length).fill(''),
+            statusText: '静的モード: 「自動割当を実行」を押すと自動割当を計算します。',
+            statusKind: ''
+          };
+        }
       }
 
       editor.innerHTML = renderMixed(mixed, result.classes);
@@ -531,7 +470,6 @@ const $ = (id) => document.getElementById(id);
         mixedText: getMixedText(),
         sources: getSources(),
         colors: getColors(),
-        currentMode,
         assignmentRunMode
       };
       return JSON.stringify(state, null, 2);
@@ -572,11 +510,7 @@ const $ = (id) => document.getElementById(id);
       if (data.assignmentRunMode === 'static' || data.assignmentRunMode === 'dynamic') {
         setAssignmentRunMode(data.assignmentRunMode);
       }
-      if (data.currentMode === 'assign' || data.currentMode === 'overlap') {
-        setMode(data.currentMode);
-      } else {
-        refreshHighlight(false);
-      }
+      refreshHighlight(false);
     }
 
     function clearHighlight() {
@@ -661,8 +595,6 @@ const $ = (id) => document.getElementById(id);
       invalidateAssignmentCache();
       loadExample();
     });
-    $('modeOverlapBtn').addEventListener('click', () => setMode('overlap'));
-    $('modeAssignBtn').addEventListener('click', () => setMode('assign'));
     $('runDynamicBtn').addEventListener('click', () => {
       setAssignmentRunMode('dynamic');
       refreshHighlight(false);
