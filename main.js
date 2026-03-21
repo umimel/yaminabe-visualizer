@@ -16,6 +16,7 @@ const COLOR_OPTIONS = [
     ['#a65628', '茶'],
     ['#f781bf', 'ピンク'],
     ['#17becf', '水色'],
+    ['#cbd5e1', '薄灰'],
     ['#111111', '黒']
 ];
 const COLOR_NAME = Object.fromEntries(COLOR_OPTIONS);
