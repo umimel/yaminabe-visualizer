@@ -22,11 +22,6 @@
         <div class="title">混合問題文</div>
         <div class="controls">
 
-          <div class="modeGroup">
-            <button id="runDynamicBtn" class="modeBtn active">動的モード</button>
-            <button id="runStaticBtn" class="modeBtn">静的モード</button>
-          </div>
-          <button id="runAssignBtn" style="display:none;">自動割当を実行</button>
           <button id="exportBtn">JSON書き出し</button>
           <button id="importBtn">JSON読み込み</button>
           <button id="plainBtn">色を消す</button>
@@ -35,7 +30,7 @@
       </div>
       <div class="titleRow">
         <div class="hint">
-          この領域を直接編集できます。入力された全問題文を本当に同時実現できる場合のみ、1つの割当を構成して表示します。動的モードでは入力のたびに更新し、静的モードではボタンを押したときだけ更新します。
+          この領域を直接編集できます。入力された全問題文を本当に同時実現できる場合のみ、1つの割当を構成して表示します。入力のたびに自動で更新します。
         </div>
         <div class="legend">
           <span class="pill"><span class="swatch" id="legend1"
@@ -56,16 +51,18 @@
       <div id="mixedEditor" class="mixedEditor" contenteditable="true" spellcheck="false"
         data-placeholder="ここに混合問題文を入力してください。"></div>
       <div id="statusText" class="statusText"></div>
-      <div id="jsonPanel" class="jsonPanel" style="display:none;">
-        <div class="jsonPanelHeader">
-          <div class="title">状態JSON</div>
-          <div class="controls">
-            <button id="copyJsonBtn">コピー</button>
-            <button id="applyJsonBtn">読み込みを反映</button>
-            <button id="closeJsonBtn">閉じる</button>
+      <div id="jsonOverlay" class="jsonOverlay" style="display:none;">
+        <div id="jsonPanel" class="jsonPanel">
+          <div class="jsonPanelHeader">
+            <div class="title">状態JSON</div>
+            <div class="controls">
+              <button id="copyJsonBtn">コピー</button>
+              <button id="applyJsonBtn">読み込みを反映</button>
+              <button id="closeJsonBtn">閉じる</button>
+            </div>
           </div>
+          <textarea id="jsonArea" class="jsonArea" spellcheck="false"></textarea>
         </div>
-        <textarea id="jsonArea" class="jsonArea" spellcheck="false"></textarea>
       </div>
     </div>
 

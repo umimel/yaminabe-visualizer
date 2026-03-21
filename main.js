@@ -1,10 +1,10 @@
 const $ = (id) => document.getElementById(id);
 
-const EXAMPLE_1 = '文字列Sが与えられます。Sを2回繰り返して連結させた文字列を出力してください。';
-const EXAMPLE_2 = '正整数Nが与えられます。Nを2倍して得られる整数を求めてください。';
+const EXAMPLE_1 = '整数Nと文字列Sが与えられます。Sを2回繰り返して連結させた文字列を出力してください。';
+const EXAMPLE_2 = '整数Nと文字列Sが与えられます。Nを2倍して得られる整数を求めてください。';
 const EXAMPLE_3 = '';
 const EXAMPLE_4 = '';
-const EXAMPLE_MIXED = '正文整数Nが与字え列らSがれ与まえられす。まNをす。Sを2回繰り2返倍ししてて得連結させらた文れる字列整を数を出力して求めくだてさください。い。';
+const EXAMPLE_MIXED = '整数整N数Nとと文文字字列Sが与列Sがえ与らえられますれ。Sますを。2回繰Nりを2返して連倍結しさせたて文得字列をられる整出数力しをてく求だめてさください。い。';
 
 const COLOR_OPTIONS = [
     ['#ff0000', '赤'],
@@ -20,8 +20,6 @@ const COLOR_OPTIONS = [
 ];
 const COLOR_NAME = Object.fromEntries(COLOR_OPTIONS);
 
-let assignmentRunMode = 'dynamic';
-let cachedAssignment = null;
 
 function escapeHtml(s) {
     return s
@@ -305,24 +303,8 @@ function renderAssignmentMode(mixed, sources) {
     };
 }
 
-function cacheSignature() {
-    return JSON.stringify({ mixed: getMixedText(), sources: getSources() });
-}
-
 function recomputeAssignmentRender() {
-    cachedAssignment = {
-        signature: cacheSignature(),
-        result: renderAssignmentMode(getMixedText(), getSources())
-    };
-    return cachedAssignment.result;
-}
-
-
-function setAssignmentRunMode(mode) {
-    assignmentRunMode = mode;
-    $('runDynamicBtn').classList.toggle('active', mode === 'dynamic');
-    $('runStaticBtn').classList.toggle('active', mode === 'static');
-    $('runAssignBtn').style.display = (mode === 'static') ? '' : 'none';
+    return renderAssignmentMode(getMixedText(), getSources());
 }
 
 function refreshHighlight(preserveCaret = false) {
@@ -331,27 +313,7 @@ function refreshHighlight(preserveCaret = false) {
     const caret = preserveCaret ? getCaretOffset(editor) : null;
     applyThemeColors();
 
-    let result;
-    if (assignmentRunMode === 'dynamic') {
-        result = recomputeAssignmentRender();
-    } else {
-        const sig = cacheSignature();
-        if (cachedAssignment && cachedAssignment.signature === sig) {
-            result = cachedAssignment.result;
-        } else if (cachedAssignment) {
-            result = {
-                classes: cachedAssignment.result.classes.slice(),
-                statusText: '静的モード: 入力が変更されました。現在は前回の色付けを表示中です。「自動割当を実行」を押すと更新します。',
-                statusKind: ''
-            };
-        } else {
-            result = {
-                classes: Array(mixed.length).fill(''),
-                statusText: '静的モード: 「自動割当を実行」を押すと自動割当を計算します。',
-                statusKind: ''
-            };
-        }
-    }
+    const result = recomputeAssignmentRender();
 
     editor.innerHTML = renderMixed(mixed, result.classes);
     const status = $('statusText');
@@ -371,18 +333,18 @@ function exportStateJson() {
         mixedText: getMixedText(),
         sources: getSources(),
         colors: getColors(),
-        assignmentRunMode
+        assignmentRunMode: 'dynamic'
     };
     return JSON.stringify(state, null, 2);
 }
 
 function openJsonPanel(withText = '') {
-    $('jsonPanel').style.display = '';
+    $('jsonOverlay').style.display = '';
     $('jsonArea').value = withText;
 }
 
 function closeJsonPanel() {
-    $('jsonPanel').style.display = 'none';
+    $('jsonOverlay').style.display = 'none';
 }
 
 function importStateJson(raw) {
@@ -408,9 +370,6 @@ function importStateJson(raw) {
     updateAllColorPreviews();
     applyThemeColors();
 
-    if (data.assignmentRunMode === 'static' || data.assignmentRunMode === 'dynamic') {
-        setAssignmentRunMode(data.assignmentRunMode);
-    }
     refreshHighlight(false);
 }
 
@@ -433,10 +392,6 @@ function loadExample() {
     refreshHighlight(false);
 }
 
-function invalidateAssignmentCache() {
-    cachedAssignment = null;
-}
-
 populateColorSelect('color1', '#ff0000');
 populateColorSelect('color2', '#0000ff');
 populateColorSelect('color3', '#40BA8D');
@@ -448,7 +403,6 @@ buildColorPicker(4);
 
 ['src1', 'src2', 'src3', 'src4'].forEach((id) => {
     $(id).addEventListener('input', () => {
-        if (assignmentRunMode === 'dynamic') invalidateAssignmentCache();
         refreshHighlight(false);
     });
 });
@@ -456,7 +410,6 @@ buildColorPicker(4);
 document.addEventListener('click', () => closeAllPickers());
 
 $('mixedEditor').addEventListener('input', () => {
-    if (assignmentRunMode === 'dynamic') invalidateAssignmentCache();
     refreshHighlight(true);
 });
 $('exportBtn').addEventListener('click', () => {
@@ -493,22 +446,8 @@ $('applyJsonBtn').addEventListener('click', () => {
 $('closeJsonBtn').addEventListener('click', closeJsonPanel);
 $('plainBtn').addEventListener('click', clearHighlight);
 $('exampleBtn').addEventListener('click', () => {
-    invalidateAssignmentCache();
     loadExample();
-});
-$('runDynamicBtn').addEventListener('click', () => {
-    setAssignmentRunMode('dynamic');
-    refreshHighlight(false);
-});
-$('runStaticBtn').addEventListener('click', () => {
-    setAssignmentRunMode('static');
-    refreshHighlight(false);
-});
-$('runAssignBtn').addEventListener('click', () => {
-    recomputeAssignmentRender();
-    refreshHighlight(false);
 });
 
 setMixedText('');
-setAssignmentRunMode('dynamic');
 refreshHighlight(false);
