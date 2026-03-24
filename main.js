@@ -450,6 +450,8 @@ $('cleanTextBtn').addEventListener('click', () => {
     let text = getMixedText();
     // 改行、タブ、ゼロ幅スペースを削除
     text = text.replace(/[\r\n\u2028\u2029\t\u200B]+/g, '');
+    // 演算子記号の標準化: U+2212 (−) -> U+002D (-), U+00D7 (×) -> U+0078 (x)
+    text = text.replace(/\u2212/g, '-').replace(/\u00D7/g, 'x');
     // イタリック体を通常のASCII文字に変換
     text = Array.from(text).map(ch => {
         const cp = ch.codePointAt(0);
