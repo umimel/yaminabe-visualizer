@@ -453,6 +453,22 @@ $('removeNewlineBtn').addEventListener('click', () => {
     setMixedText(text);
     refreshHighlight(false);
 });
+$('removeItalicBtn').addEventListener('click', () => {
+    let text = getMixedText();
+    text = Array.from(text).map(ch => {
+        const cp = ch.codePointAt(0);
+        if (cp >= 0x1D434 && cp <= 0x1D44D) { // A-Z
+            return String.fromCodePoint(cp - 0x1D434 + 65);
+        }
+        if (cp >= 0x1D44E && cp <= 0x1D467) { // a-z
+            return String.fromCodePoint(cp - 0x1D44E + 97);
+        }
+        if (cp === 0x210E) return 'h'; // Planck constant (used as italic h)
+        return ch;
+    }).join('');
+    setMixedText(text);
+    refreshHighlight(false);
+});
 $('exampleBtn').addEventListener('click', () => {
     loadExample();
 });
