@@ -446,15 +446,11 @@ $('applyJsonBtn').addEventListener('click', () => {
 });
 $('closeJsonBtn').addEventListener('click', closeJsonPanel);
 $('plainBtn').addEventListener('click', clearHighlight);
-$('removeNewlineBtn').addEventListener('click', () => {
+$('cleanTextBtn').addEventListener('click', () => {
     let text = getMixedText();
-    // \r\n, \n, \r に加え、Unicodeの行区切り文字 (\u2028) や段落区切り文字 (\u2029) にも対応
-    text = text.replace(/[\r\n\u2028\u2029]+/g, '');
-    setMixedText(text);
-    refreshHighlight(false);
-});
-$('removeItalicBtn').addEventListener('click', () => {
-    let text = getMixedText();
+    // 改行、タブ、ゼロ幅スペースを削除
+    text = text.replace(/[\r\n\u2028\u2029\t\u200B]+/g, '');
+    // イタリック体を通常のASCII文字に変換
     text = Array.from(text).map(ch => {
         const cp = ch.codePointAt(0);
         if (cp >= 0x1D434 && cp <= 0x1D44D) { // A-Z
