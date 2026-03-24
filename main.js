@@ -218,15 +218,15 @@ function solveUniqueAssignment(mixed, sources) {
 
     let steps = 0;
     const MAX_STEPS = 3000000;
-    
+
     const useFastKey = mixed.length <= 4095 && lens.every(l => l <= 1023);
 
     function dfs(mix_i, p0, p1, p2, p3) {
         if (steps++ > MAX_STEPS) return false;
-        
+
         const progress = p0 + p1 + p2 + p3;
         if (progress > bestProgress) bestProgress = progress;
-        
+
         if (progress === sumLens) {
             return true;
         }
@@ -253,15 +253,15 @@ function solveUniqueAssignment(mixed, sources) {
 
             if (p < lens[t] && src[t][p] === ch) {
                 assignment[mix_i] = t + 1;
-                
+
                 let ok;
                 if (t === 0) ok = dfs(mix_i + 1, p0 + 1, p1, p2, p3);
                 else if (t === 1) ok = dfs(mix_i + 1, p0, p1 + 1, p2, p3);
                 else if (t === 2) ok = dfs(mix_i + 1, p0, p1, p2 + 1, p3);
                 else ok = dfs(mix_i + 1, p0, p1, p2, p3 + 1);
-                
+
                 if (ok) return true;
-                
+
                 assignment[mix_i] = 0;
             }
         }
@@ -446,6 +446,12 @@ $('applyJsonBtn').addEventListener('click', () => {
 });
 $('closeJsonBtn').addEventListener('click', closeJsonPanel);
 $('plainBtn').addEventListener('click', clearHighlight);
+$('removeNewlineBtn').addEventListener('click', () => {
+    let text = getMixedText();
+    text = text.replace(/\n|\r/g, '');
+    setMixedText(text);
+    refreshHighlight(false);
+});
 $('exampleBtn').addEventListener('click', () => {
     loadExample();
 });
