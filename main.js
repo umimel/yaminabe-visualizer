@@ -448,7 +448,8 @@ $('closeJsonBtn').addEventListener('click', closeJsonPanel);
 $('plainBtn').addEventListener('click', clearHighlight);
 $('removeNewlineBtn').addEventListener('click', () => {
     let text = getMixedText();
-    text = text.replace(/\n|\r/g, '');
+    // \r\n, \n, \r に加え、Unicodeの行区切り文字 (\u2028) や段落区切り文字 (\u2029) にも対応
+    text = text.replace(/[\r\n\u2028\u2029]+/g, '');
     setMixedText(text);
     refreshHighlight(false);
 });
