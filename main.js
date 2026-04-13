@@ -243,6 +243,7 @@ function solveUniqueAssignment(mixed, sources) {
         if (visited.has(key)) return false;
 
         const ch = mixed[mix_i];
+        let one_matched = false;
 
         for (let t = 0; t < 4; t++) {
             let p;
@@ -263,10 +264,12 @@ function solveUniqueAssignment(mixed, sources) {
                 if (ok) return true;
 
                 assignment[mix_i] = 0;
+
+                one_matched = true;
             }
         }
 
-        if (spare.get(ch) > 0) {
+        if (!one_matched && spare.get(ch) > 0) {
             spare.set(ch, spare.get(ch) - 1);
             if (dfs(mix_i + 1, p0, p1, p2, p3)) return true;
             spare.set(ch, spare.get(ch) + 1);
