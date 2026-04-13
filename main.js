@@ -280,8 +280,10 @@ function solveUniqueAssignment(mixed, sources) {
 
     if (success) {
         return { ok: true, assignment: assignment };
-    } else {
+    } else if (steps < MAX_STEPS) {
         return { ok: false, assignment: null, message: `矛盾が発生しました (最良進捗: ${bestProgress}/${sumLens})` };
+    } else {
+        return { ok: false, assignment: null, message: `探索上限に達しました (最良進捗: ${bestProgress}/${sumLens})` };
     }
 }
 
